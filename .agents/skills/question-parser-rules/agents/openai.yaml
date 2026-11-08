@@ -1,0 +1,4 @@
+interface:
+  display_name: "Question Parser Rules"
+  short_description: "surveycore-py 题型解析与字段映射"
+  default_prompt: "Use $question-parser-rules to adapt surveycore-py parsers, metadata fields, and answer mappings."

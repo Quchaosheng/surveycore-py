@@ -241,6 +241,38 @@ class TestWjxHtmlParser:
         assert questions[2]["num"] == 23
         assert questions[2]["display_num"] == 2
 
+    def test_parse_survey_questions_skips_hidden_empty_gapfill_placeholder(self) -> None:
+        html = """
+        <html>
+          <body>
+            <div id="divQuestion">
+              <fieldset>
+                <div topic="11" id="div11" type="9" gapfill="1" relation="0" style="display:none;">
+                  <div class="field-label">
+                    <div class="topicnumber">11.</div>
+                    <div class="topichtml">题目 <span class="req">*</span></div>
+                  </div>
+                  <div class="errorMessage"></div>
+                </div>
+                <div topic="12" id="div12" type="9" gapfill="1" relation="1,1" style="display:none;">
+                  <div class="field-label">
+                    <div class="topicnumber">12.</div>
+                    <div class="topichtml">隐藏填空</div>
+                  </div>
+                  <input id="q12" type="text" style="display:none;" />
+                  <span contenteditable="true"></span>
+                </div>
+              </fieldset>
+            </div>
+          </body>
+        </html>
+        """
+
+        questions = parse_survey_questions_from_html(html)
+
+        assert [question["num"] for question in questions] == [12]
+        assert questions[0]["text_inputs"] == 1
+
     def test_parse_survey_questions_treats_hidden_ancestor_question_as_hidden(self) -> None:
         html = """
         <html>

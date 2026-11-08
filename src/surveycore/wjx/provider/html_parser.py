@@ -225,6 +225,14 @@ def parse_survey_questions_from_html(html: str) -> List[Dict[str, Any]]:
             type_code = str(question_div.get("type") or "").strip() or "0"
             if type_code != "11" and _soup_question_looks_like_reorder(question_div):
                 type_code = "11"
+            if (
+                type_code == "9"
+                and str(question_div.get("gapfill") or "").strip() == "1"
+                and str(question_div.get("relation") or "").strip() in {"", "0"}
+                and _question_div_or_ancestors_are_hidden(question_div)
+                and _count_text_inputs_in_soup(question_div) == 0
+            ):
+                continue
             is_description = _soup_question_looks_like_description(question_div, type_code)
             is_required = _soup_question_is_required(question_div)
             is_rating = False
