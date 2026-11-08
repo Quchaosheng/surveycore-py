@@ -54,6 +54,7 @@ module-name = "surveycore"
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+exclude = [".agents"]
 
 [tool.ruff.lint]
 select = ["ASYNC", "B", "E4", "E7", "E9", "F", "I"]
