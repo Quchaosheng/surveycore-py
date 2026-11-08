@@ -975,7 +975,7 @@ async def test_wjx_http_runtime_skips_jump_hidden_questions(monkeypatch) -> None
 
 
 @pytest.mark.asyncio
-async def test_wjx_http_runtime_passes_slot_label_to_reverse_fill_builder(monkeypatch) -> None:
+async def test_wjx_http_runtime_passes_slot_label_to_answer_builder(monkeypatch) -> None:
     config = ExecutionConfig(
         url="https://www.wjx.cn/vm/demo.aspx",
         survey_provider="wjx",

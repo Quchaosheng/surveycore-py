@@ -9,3 +9,4 @@ __pycache__/
 *.py[cod]
 AGENTS.md
 *.code-workspace
+desktop.ini

@@ -5,10 +5,8 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Callable, Deque, Dict, List, Optional, Tuple, Union
 
-from surveycore.core.reverse_fill import ReverseFillRuntimeState, ReverseFillSpec
 from surveycore.core.task.distribution_state import DistributionRuntimeMixin
 from surveycore.core.task.progress_state import ThreadProgressMixin, ThreadProgressState
-from surveycore.core.task.reverse_fill_state import ReverseFillRuntimeMixin
 from surveycore.providers.contracts import SurveyQuestionMeta
 
 
@@ -42,8 +40,6 @@ class ExecutionConfig:
     answer_rules: List[Dict[str, Any]] = field(default_factory=list)
     answer_generator: Optional[Callable[..., Any]] = field(default=None, repr=False)
     question_entries: List[Any] = field(default_factory=list)
-    reverse_fill_spec: Optional[ReverseFillSpec] = None
-
     question_config_index_map: Dict[int, Tuple[str, int]] = field(default_factory=dict)
     provider_question_config_index_map: Dict[str, Tuple[str, int]] = field(default_factory=dict)
     question_dimension_map: Dict[int, Optional[str]] = field(default_factory=dict)
@@ -78,7 +74,6 @@ class ExecutionConfig:
 class ExecutionState(
     ThreadProgressMixin,
     DistributionRuntimeMixin,
-    ReverseFillRuntimeMixin,
 ):
     
 
@@ -100,8 +95,6 @@ class ExecutionState(
     joint_reserved_sample_started_at_by_thread: Dict[str, float] = field(default_factory=dict)
     joint_committed_sample_indexes: set[int] = field(default_factory=set)
     joint_answering_threads: set[str] = field(default_factory=set)
-
-    reverse_fill_runtime: Optional[ReverseFillRuntimeState] = None
 
     stop_event: threading.Event = field(default_factory=threading.Event)
     lock: threading.Lock = field(default_factory=threading.Lock)

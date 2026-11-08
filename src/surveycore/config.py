@@ -80,11 +80,6 @@ def serialize_config(config: RunConfig) -> dict[str, Any]:
         "reliability_mode": bool(config.reliability_mode),
         "target_alpha": float(config.target_alpha),
         "answer_rules": list(config.answer_rules),
-        "reverse_fill_enabled": bool(config.reverse_fill_enabled),
-        "reverse_fill_source_path": str(config.reverse_fill_source_path),
-        "reverse_fill_format": str(config.reverse_fill_format),
-        "reverse_fill_start_row": int(config.reverse_fill_start_row),
-        "reverse_fill_threads": int(config.reverse_fill_threads),
     }
 
 
@@ -119,10 +114,6 @@ def deserialize_config(payload: Any) -> RunConfig:
     provider = payload.get("provider")
     if provider is not None and (not isinstance(provider, str) or provider not in {"wjx", "qq", "credamo"}):
         raise ConfigError("provider 必须是 wjx、qq 或 credamo")
-    reverse_fill_start_row = payload.get("reverse_fill_start_row", 1)
-    reverse_fill_threads = payload.get("reverse_fill_threads", 1)
-    if any(isinstance(value, bool) or not isinstance(value, int) or value < 1 for value in (reverse_fill_start_row, reverse_fill_threads)):
-        raise ConfigError("反填行号和线程数必须是正整数")
     return RunConfig(
         url=_required_string(payload.get("url", ""), "url"),
         questions=questions,
@@ -137,11 +128,6 @@ def deserialize_config(payload: Any) -> RunConfig:
         reliability_mode=_strict_bool(payload.get("reliability_mode", True), "reliability_mode"),
         target_alpha=_strict_float(payload.get("target_alpha", 0.85), "target_alpha"),
         answer_rules=_list_of_dicts(payload.get("answer_rules", []), "answer_rules"),
-        reverse_fill_enabled=_strict_bool(payload.get("reverse_fill_enabled", False), "reverse_fill_enabled"),
-        reverse_fill_source_path=_required_string(payload.get("reverse_fill_source_path", ""), "reverse_fill_source_path", allow_empty=True),
-        reverse_fill_format=_required_string(payload.get("reverse_fill_format", "auto"), "reverse_fill_format"),
-        reverse_fill_start_row=reverse_fill_start_row,
-        reverse_fill_threads=reverse_fill_threads,
     )
 
 

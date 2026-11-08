@@ -35,13 +35,6 @@ from surveycore.core.questions.utils import (
     normalize_droplist_probs,
     weighted_index,
 )
-from surveycore.core.reverse_fill.runtime import resolve_current_reverse_fill_answer
-from surveycore.core.reverse_fill.schema import (
-    REVERSE_FILL_KIND_CHOICE,
-    REVERSE_FILL_KIND_MATRIX,
-    REVERSE_FILL_KIND_MULTI_TEXT,
-    REVERSE_FILL_KIND_TEXT,
-)
 from surveycore.core.task import ExecutionState
 from surveycore.providers.answering import AnswerAction
 from surveycore.providers.answering.option_fill import default_missing_option_fill
@@ -75,16 +68,7 @@ async def _build_wjx_single_action(
     current = int(question.num or 0)
     option_texts = await _resolve_runtime_option_texts(driver, question)
     option_count = max(1, len(option_texts) or int(question.options or 0))
-    reverse_fill_answer = resolve_current_reverse_fill_answer(
-        ctx,
-        current,
-        thread_name=thread_name,
-    )
-    forced_index: Optional[int] = None
-    if reverse_fill_answer is not None and reverse_fill_answer.kind == REVERSE_FILL_KIND_CHOICE:
-        forced_index = _valid_forced_choice_index(reverse_fill_answer.choice_index, option_count)
-    if forced_index is None:
-        forced_index = _valid_forced_choice_index(question.forced_option_index, option_count)
+    forced_index = _valid_forced_choice_index(question.forced_option_index, option_count)
 
     strict_ratio = False
     dimension = config.question_dimension_map.get(current)
@@ -163,16 +147,8 @@ async def _build_wjx_dropdown_action(
     current = int(question.num or 0)
     option_texts = await _resolve_runtime_option_texts(driver, question)
     option_count = max(1, len(option_texts) or int(question.options or 0))
-    reverse_fill_answer = resolve_current_reverse_fill_answer(
-        ctx,
-        current,
-        thread_name=thread_name,
-    )
     forced_index: Optional[int] = None
-    if reverse_fill_answer is not None and reverse_fill_answer.kind == REVERSE_FILL_KIND_CHOICE:
-        forced_index = _valid_forced_choice_index(reverse_fill_answer.choice_index, option_count)
-    if forced_index is None:
-        forced_index = _valid_forced_choice_index(question.forced_option_index, option_count)
+    forced_index = _valid_forced_choice_index(question.forced_option_index, option_count)
 
     dimension = config.question_dimension_map.get(current)
     has_reliability_dimension = isinstance(dimension, str) and bool(str(dimension).strip())
@@ -247,57 +223,46 @@ async def _build_wjx_text_action(
     config = ctx.config
     current = int(question.num or 0)
     blank_count = max(1, int(question.text_inputs or 0))
-    reverse_fill_answer = resolve_current_reverse_fill_answer(
-        ctx,
-        current,
-        thread_name=thread_name,
-    )
-
-    if reverse_fill_answer is not None and reverse_fill_answer.kind == REVERSE_FILL_KIND_MULTI_TEXT:
-        text_values = [str(item or "").strip() or DEFAULT_FILL_TEXT for item in list(reverse_fill_answer.text_values or [])]
-    elif reverse_fill_answer is not None and reverse_fill_answer.kind == REVERSE_FILL_KIND_TEXT:
-        text_values = [str(reverse_fill_answer.text_value or "").strip() or DEFAULT_FILL_TEXT]
-    else:
-        ai_enabled = bool(config.text_ai_flags[config_index]) if config_index < len(config.text_ai_flags) else False
-        if ai_enabled:
-            cached_answers = ctx.get_free_ai_prefill_answer(thread_name, current)
-            if cached_answers:
-                text_values = [str(item or "").strip() or DEFAULT_FILL_TEXT for item in cached_answers]
-            elif allow_ai_placeholder:
-                text_values = [
-                    build_free_ai_text_placeholder(current, blank_index)
-                    for blank_index in range(blank_count)
-                ]
-            else:
-                question_type = "multi_fill_blank" if blank_count > 1 else "fill_blank"
-                try:
-                    generated = await agenerate_ai_answer(
-                        str(question.title or ""),
-                        question_type=question_type,
-                        blank_count=blank_count,
-                        description=str(question.description or ""),
-                        question_number=current,
-                        ctx=ctx,
-                    )
-                except AIRuntimeError as exc:
-                    raise AIRuntimeError(f"问卷星第{current}题 AI 生成失败：{exc}") from exc
-                text_values = (
-                    [str(item or "").strip() or DEFAULT_FILL_TEXT for item in list(generated or [])]
-                    if isinstance(generated, list)
-                    else [str(generated or "").strip() or DEFAULT_FILL_TEXT]
-                )
+    ai_enabled = bool(config.text_ai_flags[config_index]) if config_index < len(config.text_ai_flags) else False
+    if ai_enabled:
+        cached_answers = ctx.get_free_ai_prefill_answer(thread_name, current)
+        if cached_answers:
+            text_values = [str(item or "").strip() or DEFAULT_FILL_TEXT for item in cached_answers]
+        elif allow_ai_placeholder:
+            text_values = [
+                build_free_ai_text_placeholder(current, blank_index)
+                for blank_index in range(blank_count)
+            ]
         else:
-            text_entry_types = list(getattr(ctx.config, "text_entry_types", []) or [])
-            multi_text_blank_modes = list(getattr(ctx.config, "multi_text_blank_modes", []) or [])
-            multi_text_blank_ranges = list(getattr(ctx.config, "multi_text_blank_int_ranges", []) or [])
-            text_values = resolve_text_values_from_config(
-                config.texts[config_index] if config_index < len(config.texts) else [DEFAULT_FILL_TEXT],
-                config.texts_prob[config_index] if config_index < len(config.texts_prob) else [1.0],
-                blank_count=blank_count,
-                entry_type=str(text_entry_types[config_index] if config_index < len(text_entry_types) else "text"),
-                blank_modes=multi_text_blank_modes[config_index] if config_index < len(multi_text_blank_modes) else [],
-                blank_int_ranges=multi_text_blank_ranges[config_index] if config_index < len(multi_text_blank_ranges) else [],
+            question_type = "multi_fill_blank" if blank_count > 1 else "fill_blank"
+            try:
+                generated = await agenerate_ai_answer(
+                    str(question.title or ""),
+                    question_type=question_type,
+                    blank_count=blank_count,
+                    description=str(question.description or ""),
+                    question_number=current,
+                    ctx=ctx,
+                )
+            except AIRuntimeError as exc:
+                raise AIRuntimeError(f"问卷星第{current}题 AI 生成失败：{exc}") from exc
+            text_values = (
+                [str(item or "").strip() or DEFAULT_FILL_TEXT for item in list(generated or [])]
+                if isinstance(generated, list)
+                else [str(generated or "").strip() or DEFAULT_FILL_TEXT]
             )
+    else:
+        text_entry_types = list(getattr(ctx.config, "text_entry_types", []) or [])
+        multi_text_blank_modes = list(getattr(ctx.config, "multi_text_blank_modes", []) or [])
+        multi_text_blank_ranges = list(getattr(ctx.config, "multi_text_blank_int_ranges", []) or [])
+        text_values = resolve_text_values_from_config(
+            config.texts[config_index] if config_index < len(config.texts) else [DEFAULT_FILL_TEXT],
+            config.texts_prob[config_index] if config_index < len(config.texts_prob) else [1.0],
+            blank_count=blank_count,
+            entry_type=str(text_entry_types[config_index] if config_index < len(text_entry_types) else "text"),
+            blank_modes=multi_text_blank_modes[config_index] if config_index < len(multi_text_blank_modes) else [],
+            blank_int_ranges=multi_text_blank_ranges[config_index] if config_index < len(multi_text_blank_ranges) else [],
+        )
 
     if not text_values:
         text_values = [DEFAULT_FILL_TEXT]
@@ -325,16 +290,7 @@ async def _build_wjx_score_like_action(
     current = int(question.num or 0)
     option_texts = await _resolve_runtime_option_texts(driver, question)
     option_count = max(2, len(option_texts) or int(question.options or 0))
-    reverse_fill_answer = resolve_current_reverse_fill_answer(
-        ctx,
-        current,
-        thread_name=thread_name,
-    )
-    forced_index: Optional[int] = None
-    if reverse_fill_answer is not None and reverse_fill_answer.kind == REVERSE_FILL_KIND_CHOICE:
-        forced_index = _valid_forced_choice_index(reverse_fill_answer.choice_index, option_count)
-    if forced_index is None:
-        forced_index = _valid_forced_choice_index(question.forced_option_index, option_count)
+    forced_index = _valid_forced_choice_index(question.forced_option_index, option_count)
 
     if forced_index is None:
         probabilities = config.scale_prob[config_index] if config_index < len(config.scale_prob) else -1
@@ -424,16 +380,6 @@ async def _build_wjx_multiple_action(
             selected_texts=tuple(selected_texts),
             record_type="multiple",
         )
-
-    reverse_fill_answer = resolve_current_reverse_fill_answer(
-        ctx,
-        current,
-        thread_name=thread_name,
-    )
-    if reverse_fill_answer is not None and reverse_fill_answer.kind == REVERSE_FILL_KIND_CHOICE:
-        forced_index = reverse_fill_answer.choice_index
-        if forced_index is not None:
-            return await _finalize(_normalize_selected_indices([forced_index], option_count))
 
     selection_probabilities = config.multiple_prob[config_index] if config_index < len(config.multiple_prob) else [50.0] * option_count
     if selection_probabilities == -1 or (
@@ -532,65 +478,54 @@ async def _build_wjx_matrix_action(
     current = int(question.num or 0)
     row_count = max(1, int(question.rows or 1))
     option_count = max(2, len(question.option_texts or []) or int(question.options or 0))
-    reverse_fill_answer = resolve_current_reverse_fill_answer(
-        ctx,
-        current,
-        thread_name=thread_name,
-    )
-    forced_indices: list[int] = []
-    if reverse_fill_answer is not None and reverse_fill_answer.kind == REVERSE_FILL_KIND_MATRIX:
-        forced_indices = [int(item) for item in list(reverse_fill_answer.matrix_choice_indexes or []) if int(item) >= 0]
     strict_ratio_question = is_strict_ratio_question(ctx, current)
     selected_indices: list[int] = []
     pending: list[tuple[int, int, Optional[int]]] = []
     next_index = config_index
     for row_index in range(row_count):
-        if row_index < len(forced_indices):
-            selected_index = min(max(0, forced_indices[row_index]), option_count - 1)
+        raw_probabilities = config.matrix_prob[next_index] if next_index < len(config.matrix_prob) else -1
+        strict_reference: Optional[List[float]] = None
+        row_probabilities: Any = -1
+        if isinstance(raw_probabilities, list):
+            try:
+                probs = [float(value) for value in raw_probabilities]
+            except Exception:
+                probs = []
+            if len(probs) != option_count:
+                probs = [1.0] * option_count
+            strict_reference = list(probs)
+            probs = apply_matrix_row_consistency(probs, current, row_index)
+            if any(prob > 0 for prob in probs):
+                row_probabilities = resolve_distribution_probabilities(
+                    probs,
+                    option_count,
+                    ctx,
+                    current,
+                    row_index=row_index,
+                    psycho_plan=psycho_plan,
+                )
         else:
-            raw_probabilities = config.matrix_prob[next_index] if next_index < len(config.matrix_prob) else -1
-            strict_reference: Optional[List[float]] = None
-            row_probabilities: Any = -1
-            if isinstance(raw_probabilities, list):
-                try:
-                    probs = [float(value) for value in raw_probabilities]
-                except Exception:
-                    probs = []
-                if len(probs) != option_count:
-                    probs = [1.0] * option_count
-                strict_reference = list(probs)
-                probs = apply_matrix_row_consistency(probs, current, row_index)
-                if any(prob > 0 for prob in probs):
-                    row_probabilities = resolve_distribution_probabilities(
-                        probs,
-                        option_count,
-                        ctx,
-                        current,
-                        row_index=row_index,
-                        psycho_plan=psycho_plan,
-                    )
-            else:
-                uniform_probs = apply_matrix_row_consistency([1.0] * option_count, current, row_index)
-                if any(prob > 0 for prob in uniform_probs):
-                    row_probabilities = resolve_distribution_probabilities(
-                        uniform_probs,
-                        option_count,
-                        ctx,
-                        current,
-                        row_index=row_index,
-                        psycho_plan=psycho_plan,
-                    )
-            if strict_ratio_question and isinstance(row_probabilities, list):
-                row_probabilities = enforce_reference_rank_order(row_probabilities, strict_reference or row_probabilities)
-            selected_index = get_tendency_index(
-                option_count,
-                row_probabilities,
-                dimension=config.question_dimension_map.get(current),
-                psycho_plan=psycho_plan,
-                question_index=current,
-                row_index=row_index,
-            )
-            pending.append((selected_index, option_count, row_index))
+            uniform_probs = apply_matrix_row_consistency([1.0] * option_count, current, row_index)
+            if any(prob > 0 for prob in uniform_probs):
+                row_probabilities = resolve_distribution_probabilities(
+                    uniform_probs,
+                    option_count,
+                    ctx,
+                    current,
+                    row_index=row_index,
+                    psycho_plan=psycho_plan,
+                )
+        if strict_ratio_question and isinstance(row_probabilities, list):
+            row_probabilities = enforce_reference_rank_order(row_probabilities, strict_reference or row_probabilities)
+        selected_index = get_tendency_index(
+            option_count,
+            row_probabilities,
+            dimension=config.question_dimension_map.get(current),
+            psycho_plan=psycho_plan,
+            question_index=current,
+            row_index=row_index,
+        )
+        pending.append((selected_index, option_count, row_index))
         selected_indices.append(selected_index)
         next_index += 1
     return AnswerAction(

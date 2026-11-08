@@ -25,12 +25,17 @@ class SubmissionVerificationRequiredError(RuntimeError):
     pass
 
 
+class SubmitProxyUnavailableError(RuntimeError):
+    pass
+
+
 class SurveyProviderUnavailableAtRuntimeError(SurveyProviderStatusError):
     pass
 
 
 __all__ = [
     "SubmissionVerificationRequiredError",
+    "SubmitProxyUnavailableError",
     "SurveyEnterpriseUnavailableError",
     "SurveyNotOpenError",
     "SurveyPausedError",

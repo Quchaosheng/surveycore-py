@@ -20,15 +20,11 @@ from surveycore.core.questions.distribution import record_pending_distribution_c
 from surveycore.core.task import ExecutionConfig, ExecutionState
 from surveycore.core.user_agent import UserAgentProfile
 from surveycore.network.http import current_client
-from surveycore.network.session_policy import (
-    SubmitProxyUnavailableError,
-    mark_submit_proxy_success,
-    release_submit_proxy,
-)
 from surveycore.providers.answering import AnswerAction
 from surveycore.providers.answering.option_fill import option_fill_text_map
 from surveycore.providers.answering.recording import record_answer_action
 from surveycore.providers.contracts import SurveyQuestionMeta
+from surveycore.providers.errors import SubmitProxyUnavailableError
 from surveycore.providers.http_logic import build_http_logic_plan
 from surveycore.providers.http_progress import update_http_submit_step
 
@@ -887,13 +883,8 @@ async def brush_credamo_http(
                 body=body,
                 user_agent=user_agent_value,
             )
-        if submit_proxy_address and thread_name:
-            release_submit_proxy(ctx, thread_name, submit_proxy_address)
     except Exception:
-        if submit_proxy_address and thread_name:
-            release_submit_proxy(ctx, thread_name, submit_proxy_address)
         raise
-    mark_submit_proxy_success(ctx, submit_proxy_address)
     await update_http_submit_step(ctx, thread_name, "校验结果")
     return True
 

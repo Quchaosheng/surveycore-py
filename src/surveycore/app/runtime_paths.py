@@ -9,8 +9,4 @@ def get_resource_path(relative_path: str) -> str:
     return str(path)
 
 
-def get_assets_directory() -> str:
-    return str(files("surveycore").joinpath("data"))
-
-
-__all__ = ["get_resource_path", "get_assets_directory"]
+__all__ = ["get_resource_path"]

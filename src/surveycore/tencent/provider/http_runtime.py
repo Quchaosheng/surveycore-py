@@ -19,16 +19,12 @@ from surveycore.core.persona.context import record_answer
 from surveycore.core.questions.distribution import record_pending_distribution_choice
 from surveycore.core.task import ExecutionConfig, ExecutionState
 from surveycore.core.user_agent import UserAgentProfile
-from surveycore.network.session_policy import (
-    SubmitProxyUnavailableError,
-    mark_submit_proxy_success,
-    release_submit_proxy,
-)
 from surveycore.providers.answering import AnswerAction
 from surveycore.providers.answering.option_fill import option_fill_text_map
 from surveycore.providers.answering.recording import record_answer_action
 from surveycore.providers.common import SURVEY_PROVIDER_QQ
 from surveycore.providers.contracts import SurveyQuestionMeta, ensure_survey_question_metas
+from surveycore.providers.errors import SubmitProxyUnavailableError
 from surveycore.providers.http_logic import build_http_logic_plan
 from surveycore.providers.http_progress import update_http_submit_step
 from surveycore.tencent.provider.answering_builders import build_answer_action
@@ -640,11 +636,7 @@ async def brush_qq_http(
                 proxies=submit_proxies,
             )
             response.raise_for_status()
-            if submit_proxy_address and thread_name:
-                release_submit_proxy(ctx, thread_name, submit_proxy_address)
         except Exception:
-            if submit_proxy_address and thread_name:
-                release_submit_proxy(ctx, thread_name, submit_proxy_address)
             raise
         await update_http_submit_step(ctx, thread_name, "校验结果")
         payload = response.json()
@@ -661,7 +653,6 @@ async def brush_qq_http(
             initial_session_data=session_data,
             submit_payload=payload,
         )
-        mark_submit_proxy_success(ctx, submit_proxy_address)
         return True
     finally:
         ctx.clear_free_ai_prefill_answers(thread_name)

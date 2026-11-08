@@ -111,11 +111,6 @@ class RunConfig:
     reliability_mode: bool = True
     target_alpha: float = 0.85
     answer_rules: list[dict[str, Any]] = field(default_factory=list)
-    reverse_fill_enabled: bool = False
-    reverse_fill_source_path: str = ""
-    reverse_fill_format: str = "auto"
-    reverse_fill_start_row: int = 1
-    reverse_fill_threads: int = 1
     answer_generator: AnswerGenerator | None = field(default=None, repr=False, compare=False)
 
 

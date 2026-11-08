@@ -60,19 +60,11 @@ def test_runtime_action_result_normalizes_callback_outputs() -> None:
     assert ensure_runtime_action_result(object()) == RuntimeActionResult.empty()
 
 
-def test_logging_compatibility_helpers_keep_their_public_return_contract(caplog) -> None:
+def test_suppressed_exception_logging(caplog) -> None:
     with caplog.at_level("INFO"):
         log_utils.log_suppressed_exception("解析失败", ValueError("bad"))
-        assert log_utils.log_deduped_message("same-key", "状态更新")
-        log_utils.reset_deduped_log_message("same-key")
-        log_utils.register_popup_handler(None)
 
     assert "[Suppressed] 解析失败: bad" in caplog.text
-    assert "状态更新" in caplog.text
-    assert log_utils.log_popup_error("错误", "提交失败") is False
-    assert log_utils.log_popup_warning("警告", "需要检查") is True
-    assert log_utils.log_popup_confirm("确认", "继续吗") is False
-    assert log_utils.shutdown_logging() is None
 
 
 def test_thread_progress_lifecycle_and_display_names() -> None:
@@ -123,7 +115,7 @@ def test_distribution_state_rejects_invalid_choices_and_tracks_joint_samples(mon
     assert state.wait_for_joint_sample(2, thread_name="Worker-3", stop_signal=stopped) is None
 
 
-def test_stale_joint_reservations_expire_but_answering_samples_survive(monkeypatch) -> None:
+def test_stale_joint_reservations_expire_but_answering_samples_survive() -> None:
     state = ExecutionState()
     assert state.reserve_joint_sample(3, "Worker-1") == 0
     assert state.reserve_joint_sample(3, "Worker-2") == 1
@@ -131,15 +123,7 @@ def test_stale_joint_reservations_expire_but_answering_samples_survive(monkeypat
     state.joint_reserved_sample_started_at_by_thread["Worker-1"] = time.monotonic() - 100
     state.joint_reserved_sample_started_at_by_thread["Worker-2"] = time.monotonic() - 100
 
-    released = []
-    monkeypatch.setattr(
-        state,
-        "release_reverse_fill_sample",
-        lambda thread_name, requeue=True: released.append((thread_name, requeue)),
-    )
-
     assert state.expire_stale_joint_sample_reservations(10) == 1
     assert state.peek_reserved_joint_sample("Worker-1") is None
     assert state.peek_reserved_joint_sample("Worker-2") == 1
-    assert released == [("Worker-1", True)]
     assert state.expire_stale_joint_sample_reservations(0) == 0
