@@ -27,6 +27,9 @@ dependencies = [
     "selectolax>=1.0.2",
 ]
 
+[project.optional-dependencies]
+excel = ["openpyxl>=3.1.5"]
+
 [project.urls]
 Homepage = "https://github.com/SurveyController/surveycore-py"
 Repository = "https://github.com/SurveyController/surveycore-py"

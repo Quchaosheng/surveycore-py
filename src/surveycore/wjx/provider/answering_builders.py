@@ -35,6 +35,7 @@ from surveycore.core.questions.utils import (
     normalize_droplist_probs,
     weighted_index,
 )
+from surveycore.core.reverse_fill.actions import build_reverse_fill_action
 from surveycore.core.task import ExecutionState
 from surveycore.providers.answering import AnswerAction
 from surveycore.providers.answering.option_fill import default_missing_option_fill
@@ -586,6 +587,9 @@ async def build_answer_action(
     if not config_entry:
         return None
     entry_type, config_index = config_entry
+    reverse_fill_answer = ctx.get_reverse_fill_answer(int(question.num), thread_name or None)
+    if reverse_fill_answer is not None:
+        return build_reverse_fill_action(reverse_fill_answer, question, entry_type)
     if entry_type == "single":
         return await _build_wjx_single_action(
             driver,

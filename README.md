@@ -119,6 +119,40 @@ asyncio.run(main())
 - `ConfigError`：配置无效或 schema 不兼容
 - `SubmissionError`：已导出的提交异常类型；`SurveyClient.submit()` 当前将单次提交异常写入 `SubmissionResult.error`
 
+## Excel 反填集成
+
+安装可选的 Excel 读取依赖：
+
+```bash
+uv add "surveycore-py[excel]"
+```
+
+反填通过独立的应用集成接口提供，不在 `RunConfig` 中保存文件路径，也不由 `SurveyClient` 隐式读取文件。
+
+```python
+from surveycore.core.reverse_fill.parser import parse_choice_answer
+from surveycore.io.spreadsheets.wjx_excel import load_wjx_excel_export
+
+export = load_wjx_excel_export("answers.xlsx", preferred_format="auto")
+column = export.question_columns[1][0]
+row = export.raw_rows[0]
+answer = parse_choice_answer(
+    question_num=1,
+    question_type="single",
+    raw_value=row.values_by_column[column.column_index],
+    export_format=export.selected_format,
+    option_texts=["差", "中", "好"],
+)
+```
+
+读取器识别首张工作表中的题号列，支持问卷星序号、分数和文本导出格式。异步程序应通过 `asyncio.to_thread()` 调用 Excel 读取器，避免阻塞事件循环。
+
+应用将解析结果按行组装为 `ReverseFillSampleRow` 和 `ReverseFillSpec`，传入 `ExecutionConfig.reverse_fill_spec`，再调用 `ExecutionState.initialize_reverse_fill_runtime()`。提交前通过 `acquire_reverse_fill_sample(slot)` 领取整行；确认成功后调用 `commit_reverse_fill_sample(slot)`，取消时通过 `release_reverse_fill_sample(slot)` 归还。失败重试仅由调用方显式调用 `mark_reverse_fill_submission_failed()` 决定。
+
+样本队列也可直接通过 `surveycore.core.reverse_fill.runtime` 使用，不依赖任务状态、HTTP 客户端或 Excel 读取器。问卷星答案入口统一将已领取的样本转换为 `AnswerAction`，缺少答案的题目沿用常规配置。支持单选、下拉、量表、评分、文本、多项填空和矩阵；多选、排序、位置及带附加输入的选择题仍由应用预检决定如何使用常规配置。题号、选项范围或行数与当前问卷不符时抛出错误。
+
+开发与 CI 使用 `uv sync --locked --extra excel` 安装反填测试所需依赖。
+
 ## GPL-3.0 License
 
 您有权免费使用、修改和分发该软件。

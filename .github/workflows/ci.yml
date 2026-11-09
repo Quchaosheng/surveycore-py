@@ -38,7 +38,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --locked
+        run: uv sync --locked --extra excel
 
       - name: Run tests with coverage gate
         run: uv run pytest --cov --cov-report=term-missing --cov-fail-under=80
@@ -61,7 +61,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --locked
+        run: uv sync --locked --extra excel
 
       - name: Check formatting and lint
         run: uv run ruff check .

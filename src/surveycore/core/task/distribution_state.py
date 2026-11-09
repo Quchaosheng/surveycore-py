@@ -19,6 +19,7 @@ if TYPE_CHECKING:
         def reserve_joint_sample(self, sample_count: int, thread_name: Optional[str] = None) -> Optional[int]: ...
         def is_joint_sample_quota_exhausted(self, sample_count: int) -> bool: ...
         def expire_stale_joint_sample_reservations(self, max_age_seconds: float) -> int: ...
+        def release_reverse_fill_sample(self, thread_name: Optional[str] = None, *, requeue: bool = True) -> Optional[int]: ...
         def notify_runtime_change(self) -> None: ...
         def wait_for_runtime_change(
             self,
@@ -167,6 +168,8 @@ class DistributionRuntimeMixin:
                 self.joint_reserved_sample_by_thread.pop(key, None)
                 self.joint_reserved_sample_started_at_by_thread.pop(key, None)
                 self.joint_answering_threads.discard(key)
+        for key in expired_keys:
+            self.release_reverse_fill_sample(key, requeue=True)
         if expired_keys:
             self.notify_runtime_change()
         return len(expired_keys)
