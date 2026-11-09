@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from selectolax.lexbor import LexborHTMLParser
 
 from surveycore.wjx.provider import html_parser_choice, html_parser_common, html_parser_rules
@@ -132,6 +133,36 @@ class TestWjxHtmlParserHelper:
             "填空4",
             "填空5",
         ]
+
+    @pytest.mark.parametrize(
+        ("markup", "expected"),
+        [
+            (
+                "项目评价<!-- 表单控件 -->"
+                "<input style='display:none' type='text'>"
+                "<label class='textEdit'><span class='textCont' contenteditable='true'></span></label>",
+                ["项目评价"],
+            ),
+            (
+                "<b>项目</b>评价<input style='display:none' type='text'>"
+                "<label class='textEdit'><span class='textCont' contenteditable='true'></span></label>",
+                ["项目 评价"],
+            ),
+            (
+                "姓名：<input style='display:none' type='text'>"
+                "<label class='textEdit'><span class='textCont' contenteditable='true'></span></label>"
+                "电话：<input style='display:none' type='text'>"
+                "<label class='textEdit'><span class='textCont' contenteditable='true'></span></label>",
+                ["姓名", "电话"],
+            ),
+        ],
+    )
+    def test_textcont_labels_keep_text_siblings_and_stop_at_previous_editor(
+        self, markup: str, expected: list[str]
+    ) -> None:
+        question_div = _parser(f"<div>{markup}</div>").css_first("div")
+
+        assert html_parser_common._extract_text_input_labels(question_div) == expected
 
     def test_extract_display_heading_text_falls_back_to_blockquote_and_plain_text(self) -> None:
         blockquote_div = _parser("<div><blockquote> 引用标题 </blockquote></div>").css_first("div")

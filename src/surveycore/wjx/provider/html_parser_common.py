@@ -8,6 +8,7 @@ from selectolax.lexbor import LexborHTMLParser
 from surveycore.core.questions.utils import _normalize_question_type_code
 from surveycore.logging.log_utils import log_suppressed_exception
 from surveycore.providers.match_utils import normalize_match_text
+
 from .regexes import WJX_MODLEN_CLASS_RE, WJX_QUESTION_PREFIX_RE, WJX_TITLE_SUFFIX_RE
 
 _TEXT_INPUT_ALLOWED_TYPES = {"text", "tel", "email", "number", "search", "url", "password"}
@@ -334,7 +335,7 @@ def _extract_text_input_labels(question_div) -> List[str]:
         parts: List[str] = []
         current = node.prev
         while current is not None:
-            if not current.is_element_node:
+            if not (current.is_element_node or current.is_text_node):
                 current = current.prev
                 continue
             name = str(current.tag or "").lower()

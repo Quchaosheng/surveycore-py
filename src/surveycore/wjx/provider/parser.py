@@ -4,9 +4,9 @@ import asyncio
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
-import surveycore.network.http as http_client
 from selectolax.lexbor import LexborHTMLParser
 
+import surveycore.network.http as http_client
 from surveycore.app.config import DEFAULT_HTTP_HEADERS
 from surveycore.providers.errors import (
     SurveyEnterpriseUnavailableError,
