@@ -33,19 +33,19 @@ def _extract_matrix_header_texts(table) -> List[str]:
     best_texts: List[str] = []
     best_score = 0
     try:
-        rows = table.find_all("tr")
+        rows = table.css("tr")
     except Exception:
         rows = []
     for row in rows:
         try:
-            if row.find(["input", "select", "textarea"]):
+            if row.css_first("input, select, textarea"):
                 continue
-            cells = row.find_all(["td", "th"])
+            cells = row.css("td, th")
         except Exception:
             continue
         if len(cells) <= 1:
             continue
-        raw_texts = [_normalize_html_text(cell.get_text(" ", strip=True)) for cell in cells]
+        raw_texts = [_normalize_html_text(cell.text(separator=" ", strip=True)) for cell in cells]
         non_empty_texts = [text for text in raw_texts if text]
         score = len(non_empty_texts)
         if score < 2:
@@ -75,7 +75,7 @@ def _collect_matrix_option_texts(soup, question_div, question_number: int) -> Tu
         )
         for key in keys:
             try:
-                raw = node.get(key)
+                raw = node.attributes.get(key)
             except Exception:
                 raw = None
             if raw is None:
@@ -88,7 +88,7 @@ def _collect_matrix_option_texts(soup, question_div, question_number: int) -> Tu
     def _extract_row_label(row, cells) -> str:
         label_text = ""
         if cells:
-            label_text = _normalize_html_text(cells[0].get_text(" ", strip=True))
+            label_text = _normalize_html_text(cells[0].text(separator=" ", strip=True))
             if not label_text:
                 label_text = _extract_attr_text(cells[0])
         if not label_text:
@@ -105,20 +105,20 @@ def _collect_matrix_option_texts(soup, question_div, question_number: int) -> Tu
                     ".itemTitleSpan",
                     ".stitle",
                 ):
-                    node = row.select_one(selector)
+                    node = row.css_first(selector)
                     if node:
-                        label_text = _normalize_html_text(node.get_text(" ", strip=True))
+                        label_text = _normalize_html_text(node.text(separator=" ", strip=True))
                         if label_text:
                             break
             except Exception as exc:
                 log_suppressed_exception("survey.parser._extract_row_label selector", exc, level=logging.ERROR)
         if not label_text:
             try:
-                for child in row.find_all(["label", "span", "div", "p"], limit=10):
+                for child in row.css("label, span, div, p")[:10]:
                     label_text = _extract_attr_text(child)
                     if label_text:
                         break
-                    label_text = _normalize_html_text(child.get_text(" ", strip=True))
+                    label_text = _normalize_html_text(child.text(separator=" ", strip=True))
                     if label_text:
                         break
             except Exception as exc:
@@ -127,20 +127,20 @@ def _collect_matrix_option_texts(soup, question_div, question_number: int) -> Tu
     table = None
     if question_div is not None:
         try:
-            table = question_div.find(id=f"divRefTab{question_number}")
+            table = question_div.css_first(f"#divRefTab{question_number}")
         except Exception:
             table = None
     if table is None and soup:
-        table = soup.find(id=f"divRefTab{question_number}")
+        table = soup.css_first(f"#divRefTab{question_number}")
     if table:
         
         
-        for row in table.find_all("tr"):
-            row_index = str(row.get("rowindex") or "").strip()
+        for row in table.css("tr"):
+            row_index = str(row.attributes.get("rowindex") or "").strip()
             if row_index and str(row_index).isdigit():
                 matrix_rows += 1
                 try:
-                    cells = row.find_all(["td", "th"])
+                    cells = row.css("td, th")
                 except Exception:
                     cells = []
                 if cells:
@@ -154,18 +154,18 @@ def _collect_matrix_option_texts(soup, question_div, question_number: int) -> Tu
         
         data_rows = []
         header_id = f"drv{question_number}_1"
-        for row in table.find_all("tr"):
-            row_id = str(row.get("id") or "")
+        for row in table.css("tr"):
+            row_id = str(row.attributes.get("id") or "")
             if row_id == header_id:
                 continue
             try:
-                cells = row.find_all(["td", "th"])
+                cells = row.css("td, th")
             except Exception:
                 cells = []
             if len(cells) <= 1:
                 continue
             first_text = _extract_row_label(row, cells)
-            other_texts = [_normalize_html_text(cell.get_text(" ", strip=True)) for cell in cells[1:]]
+            other_texts = [_normalize_html_text(cell.text(separator=" ", strip=True)) for cell in cells[1:]]
             
             if not first_text and any(other_texts):
                 continue
@@ -184,14 +184,14 @@ def _collect_matrix_option_texts(soup, question_div, question_number: int) -> Tu
     if matrix_rows == 0 and question_div is not None:
         
         try:
-            inputs = question_div.find_all("input")
+            inputs = question_div.css("input")
         except Exception:
             inputs = []
         row_indices: List[int] = []
         col_indices: List[int] = []
         name_pattern = re.compile(rf"q{question_number}[_-](\d+)(?:[_-](\d+))?")
         for item in inputs:
-            raw_name = str(item.get("name") or item.get("id") or "")
+            raw_name = str(item.attributes.get("name") or item.attributes.get("id") or "")
             if not raw_name:
                 continue
             match = name_pattern.search(raw_name)
@@ -219,9 +219,9 @@ def _collect_matrix_option_texts(soup, question_div, question_number: int) -> Tu
         try:
             candidates = []
             for selector in (".itemTitleSpan", ".itemTitle", ".item-title", ".row-title"):
-                nodes = question_div.select(selector)
+                nodes = question_div.css(selector)
                 if nodes:
-                    candidates = [_normalize_html_text(node.get_text(" ", strip=True)) for node in nodes]
+                    candidates = [_normalize_html_text(node.text(separator=" ", strip=True)) for node in nodes]
                     candidates = [text for text in candidates if text]
                     if candidates:
                         break
@@ -251,11 +251,11 @@ def _collect_matrix_option_texts(soup, question_div, question_number: int) -> Tu
 def _extract_slider_range(question_div, question_number: int) -> Tuple[Optional[float], Optional[float], Optional[float]]:
     
     try:
-        slider_input = question_div.find("input", id=f"q{question_number}")
+        slider_input = question_div.css_first(f"input#q{question_number}")
         if not slider_input:
-            slider_input = question_div.find("input", attrs={"type": "range"})
+            slider_input = question_div.css_first("input[type='range']")
         if not slider_input:
-            slider_input = question_div.find("input", class_=lambda value: value and "ui-slider-input" in str(value))
+            slider_input = question_div.css_first("input.ui-slider-input")
     except Exception:
         slider_input = None
 
@@ -267,9 +267,9 @@ def _extract_slider_range(question_div, question_number: int) -> Tuple[Optional[
 
     if slider_input:
         return (
-            _parse(slider_input.get("min")),
-            _parse(slider_input.get("max")),
-            _parse(slider_input.get("step")),
+            _parse(slider_input.attributes.get("min")),
+            _parse(slider_input.attributes.get("max")),
+            _parse(slider_input.attributes.get("step")),
         )
     return None, None, None
 
@@ -278,13 +278,13 @@ def _question_div_looks_like_slider_matrix(question_div) -> bool:
     if question_div is None:
         return False
     try:
-        slider_inputs = question_div.select("input.ui-slider-input[rowid]")
+        slider_inputs = question_div.css("input.ui-slider-input[rowid]")
     except Exception:
         slider_inputs = []
     if len(slider_inputs) < 2:
         return False
     try:
-        slider_tracks = question_div.select(".rangeslider, .range-slider, .wjx-slider")
+        slider_tracks = question_div.css(".rangeslider, .range-slider, .wjx-slider")
     except Exception:
         slider_tracks = []
     return len(slider_tracks) >= len(slider_inputs)
@@ -301,9 +301,9 @@ def _build_slider_matrix_option_texts_from_input(slider_input) -> List[str]:
         except Exception:
             return None
 
-    min_value = _parse(slider_input.get("min"))
-    max_value = _parse(slider_input.get("max"))
-    step_value = _parse(slider_input.get("step"))
+    min_value = _parse(slider_input.attributes.get("min"))
+    max_value = _parse(slider_input.attributes.get("max"))
+    step_value = _parse(slider_input.attributes.get("step"))
     if min_value is None or max_value is None:
         return []
     if step_value is None or step_value <= 0:
@@ -327,37 +327,37 @@ def _collect_slider_matrix_metadata(question_div) -> Tuple[int, List[str], List[
     option_texts: List[str] = []
 
     try:
-        row_titles = question_div.select("tr.rowtitletr .itemTitleSpan")
+        row_titles = question_div.css("tr.rowtitletr .itemTitleSpan")
     except Exception:
         row_titles = []
     if not row_titles:
         try:
-            row_titles = question_div.select("tr.rowtitletr td.title")
+            row_titles = question_div.css("tr.rowtitletr td.title")
         except Exception:
             row_titles = []
     if not row_titles:
         try:
-            row_titles = question_div.select("tr[id$='t'] .itemTitleSpan, tr[id$='t'] td.title")
+            row_titles = question_div.css("tr[id$='t'] .itemTitleSpan, tr[id$='t'] td.title")
         except Exception:
             row_titles = []
     for title in row_titles:
-        text = _normalize_html_text(title.get_text(" ", strip=True))
+        text = _normalize_html_text(title.text(separator=" ", strip=True))
         if text:
             row_texts.append(text)
 
     try:
-        scale_nodes = question_div.select(".ruler .cm[data-value]")
+        scale_nodes = question_div.css(".ruler .cm[data-value]")
     except Exception:
         scale_nodes = []
     seen_values = set()
     for node in scale_nodes:
-        value = _normalize_html_text(node.get("data-value") or "")
+        value = _normalize_html_text(node.attributes.get("data-value") or "")
         if value and value not in seen_values:
             seen_values.add(value)
             option_texts.append(value)
 
     try:
-        slider_inputs = question_div.select("input.ui-slider-input[rowid]")
+        slider_inputs = question_div.css("input.ui-slider-input[rowid]")
     except Exception:
         slider_inputs = []
     if not option_texts and slider_inputs:
@@ -365,6 +365,6 @@ def _collect_slider_matrix_metadata(question_div) -> Tuple[int, List[str], List[
 
     matrix_rows = len(slider_inputs) if slider_inputs else len(row_texts)
     if matrix_rows <= 0:
-        matrix_rows = len(question_div.select("tr[id^='drv']"))
+        matrix_rows = len(question_div.css("tr[id^='drv']"))
 
     return matrix_rows, option_texts, row_texts

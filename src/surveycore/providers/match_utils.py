@@ -46,6 +46,9 @@ def get_element_attribute(element: Any, *names: str) -> Any:
                 value = None
             if value is not None:
                 return value
+        attributes = getattr(element, "attributes", None)
+        if isinstance(attributes, dict) and attr_name in attributes:
+            return attributes[attr_name]
         if isinstance(element, dict) and attr_name in element:
             return element.get(attr_name)
     return None

@@ -5,6 +5,8 @@ import logging
 from typing import Any, Dict, List, Optional, Tuple
 
 import surveycore.network.http as http_client
+from selectolax.lexbor import LexborHTMLParser
+
 from surveycore.app.config import DEFAULT_HTTP_HEADERS
 from surveycore.providers.errors import (
     SurveyEnterpriseUnavailableError,
@@ -65,15 +67,13 @@ def is_paused_survey_page(html: str) -> bool:
 
 def _html_has_question_content(html: str) -> bool:
     try:
-        from bs4 import BeautifulSoup
-
-        soup = BeautifulSoup(html, "html.parser")
-        question_container = soup.find("div", id="divQuestion")
+        soup = LexborHTMLParser(html)
+        question_container = soup.css_first("div#divQuestion")
         if not question_container:
             return False
         return bool(
-            question_container.find_all("fieldset")
-            or question_container.find_all("div", attrs={"topic": True})
+            question_container.css("fieldset")
+            or question_container.css("div[topic]")
         )
     except Exception:
         return False
@@ -86,13 +86,11 @@ def is_stopped_survey_page(html: str) -> bool:
         return False
 
     try:
-        from bs4 import BeautifulSoup
-
-        soup = BeautifulSoup(html, "html.parser")
+        soup = LexborHTMLParser(html)
         for selector_id in ("divWorkError", "divTip"):
-            error_container = soup.find("div", id=selector_id)
+            error_container = soup.css_first(f"div#{selector_id}")
             if error_container is not None:
-                error_text = _normalize_html_text(error_container.get_text(" ", strip=True))
+                error_text = _normalize_html_text(error_container.text(separator=" ", strip=True))
                 error_text = normalize_match_text(error_text)
                 if "停止状态" in error_text and "无法作答" in error_text:
                     return True

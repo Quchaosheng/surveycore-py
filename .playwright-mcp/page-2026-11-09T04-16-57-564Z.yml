@@ -1,0 +1,207 @@
+- generic [ref=e8]:
+  - heading "example" [level=1] [ref=e12]
+  - generic [ref=e13]:
+    - group [ref=e15]:
+      - generic [ref=e16]:
+        - generic [ref=e17]:
+          - generic [ref=e18]: "*"
+          - generic [ref=e19]: "1."
+          - generic [ref=e20]: 这是一个单选题
+        - generic [ref=e21]:
+          - generic [ref=e22]:
+            - link [ref=e24] [cursor=pointer]:
+              - /url: javascript:;
+            - generic [ref=e25] [cursor=pointer]: 其他
+          - generic [ref=e26]:
+            - link [ref=e28] [cursor=pointer]:
+              - /url: javascript:;
+            - generic [ref=e29] [cursor=pointer]: 我才是B
+      - generic [ref=e30]:
+        - generic [ref=e31]:
+          - generic [ref=e32]: "*"
+          - generic [ref=e33]: "2."
+          - generic [ref=e34]: 标题【排序题】
+        - list [ref=e35]:
+          - listitem [ref=e36] [cursor=pointer]:
+            - generic [ref=e39]: 选项1
+          - listitem [ref=e40] [cursor=pointer]:
+            - generic [ref=e43]: 选项2
+          - listitem [ref=e44] [cursor=pointer]:
+            - generic [ref=e47]: 选项3
+          - listitem [ref=e48] [cursor=pointer]:
+            - generic [ref=e51]: 选项4
+          - listitem [ref=e52] [cursor=pointer]:
+            - generic [ref=e55]: 选项5
+      - generic [ref=e56]:
+        - generic [ref=e57]:
+          - generic [ref=e58]: "*"
+          - generic [ref=e59]: "3."
+          - generic [ref=e60]: 您向朋友或同事推荐我们的可能性有多大？
+        - generic [ref=e62]:
+          - generic [ref=e63]:
+            - generic [ref=e64]: 不可能
+            - generic [ref=e65]: 极有可能
+          - list [ref=e66]:
+            - listitem [ref=e67]:
+              - generic "不可能" [ref=e68] [cursor=pointer]: "0"
+            - listitem [ref=e69]:
+              - generic "1" [ref=e70] [cursor=pointer]
+            - listitem [ref=e71]:
+              - generic "2" [ref=e72] [cursor=pointer]
+            - listitem [ref=e73]:
+              - generic "3" [ref=e74] [cursor=pointer]
+            - listitem [ref=e75]:
+              - generic "4" [ref=e76] [cursor=pointer]
+            - listitem [ref=e77]:
+              - generic "5" [ref=e78] [cursor=pointer]
+            - listitem [ref=e79]:
+              - generic "6" [ref=e80] [cursor=pointer]
+            - listitem [ref=e81]:
+              - generic "7" [ref=e82] [cursor=pointer]
+            - listitem [ref=e83]:
+              - generic "8" [ref=e84] [cursor=pointer]
+            - listitem [ref=e85]:
+              - generic "9" [ref=e86] [cursor=pointer]
+            - listitem [ref=e87]:
+              - generic "极有可能" [ref=e88] [cursor=pointer]: "10"
+      - generic [ref=e89]:
+        - generic [ref=e90]:
+          - generic [ref=e91]: "*"
+          - generic [ref=e92]: "4."
+          - generic [ref=e93]: 啥？
+        - textbox [ref=e95]
+      - generic [ref=e96]:
+        - generic [ref=e97]:
+          - generic [ref=e98]: "*"
+          - generic [ref=e99]: "5."
+          - generic [ref=e100]: 标题【多选题】
+        - generic [ref=e101]:
+          - generic [ref=e102]:
+            - link [ref=e104] [cursor=pointer]:
+              - /url: javascript:;
+            - generic [ref=e105] [cursor=pointer]: 选项1
+          - generic [ref=e106]:
+            - link [ref=e108] [cursor=pointer]:
+              - /url: javascript:;
+            - generic [ref=e109] [cursor=pointer]: 选项2
+          - generic [ref=e110]:
+            - link [ref=e112] [cursor=pointer]:
+              - /url: javascript:;
+            - generic [ref=e113] [cursor=pointer]: 选项3
+      - generic [ref=e114]:
+        - generic [ref=e115]:
+          - generic [ref=e116]: "*"
+          - generic [ref=e117]: "6."
+          - generic [ref=e118]: 标题
+        - table [ref=e120]:
+          - rowgroup [ref=e128]:
+            - row [ref=e129]:
+              - columnheader [ref=e130]
+              - columnheader "1" [ref=e131]
+              - columnheader "2" [ref=e132]
+              - columnheader "3" [ref=e133]
+              - columnheader "4" [ref=e134]
+              - columnheader "5" [ref=e135]
+            - row [ref=e136]:
+              - cell "外观" [ref=e137]
+              - cell [ref=e140]
+              - cell [ref=e142]
+              - cell [ref=e144]
+              - cell [ref=e146]
+              - cell [ref=e148]
+            - row [ref=e150]:
+              - cell "功能" [ref=e151]
+              - cell [ref=e154]
+              - cell [ref=e156]
+              - cell [ref=e158]
+              - cell [ref=e160]
+              - cell [ref=e162]
+      - generic [ref=e164]:
+        - generic [ref=e165]:
+          - generic [ref=e166]: "*"
+          - generic [ref=e167]: "7."
+          - generic [ref=e168]: 标题
+        - generic [ref=e170]:
+          - generic [ref=e171]:
+            - generic [ref=e172]: 很不满意
+            - generic [ref=e173]: 很满意
+          - list [ref=e174]:
+            - listitem [ref=e175]:
+              - generic "很不满意" [ref=e176]: "1"
+            - listitem [ref=e177]:
+              - generic "不满意" [ref=e178]: "2"
+            - listitem [ref=e179]:
+              - generic "一般" [ref=e180]: "3"
+            - listitem [ref=e181]:
+              - generic "满意" [ref=e182]: "4"
+            - listitem [ref=e183]:
+              - generic "很满意" [ref=e184]: "5"
+      - generic [ref=e185]:
+        - generic [ref=e186]:
+          - generic [ref=e187]: "*"
+          - generic [ref=e188]: "8."
+          - generic [ref=e189]: 标题
+        - generic [ref=e191]:
+          - generic [ref=e192]:
+            - generic [ref=e193]: 非常不满意
+            - generic [ref=e194]: 非常满意
+          - list [ref=e195]:
+            - listitem [ref=e196]:
+              - generic "非常不满意" [ref=e197]:
+                - text: 
+                - generic [ref=e198]: 
+            - listitem [ref=e199]:
+              - generic "2" [ref=e200]:
+                - text: 
+                - generic [ref=e201]: 
+            - listitem [ref=e202]:
+              - generic "3" [ref=e203]:
+                - text: 
+                - generic [ref=e204]: 
+            - listitem [ref=e205]:
+              - generic "4" [ref=e206]:
+                - text: 
+                - generic [ref=e207]: 
+            - listitem [ref=e208]:
+              - generic "非常满意" [ref=e209]:
+                - text: 
+                - generic [ref=e210]: 
+      - generic [ref=e211]:
+        - generic [ref=e212]:
+          - generic [ref=e213]: "*"
+          - generic [ref=e214]: "9."
+          - generic [ref=e215]: 此题请选A选项
+        - generic [ref=e216]:
+          - generic [ref=e217]:
+            - link [ref=e219] [cursor=pointer]:
+              - /url: javascript:;
+            - generic [ref=e220] [cursor=pointer]: A
+          - generic [ref=e221]:
+            - link [ref=e223] [cursor=pointer]:
+              - /url: javascript:;
+            - generic [ref=e224] [cursor=pointer]: B
+      - generic [ref=e225]:
+        - generic [ref=e226]:
+          - generic [ref=e227]: "*"
+          - generic [ref=e228]: "10."
+          - generic [ref=e229]: 标题
+        - generic [ref=e230]:
+          - generic [ref=e231]:
+            - link [ref=e233] [cursor=pointer]:
+              - /url: javascript:;
+            - generic [ref=e234] [cursor=pointer]: 选项1
+          - generic [ref=e235]:
+            - link [ref=e237] [cursor=pointer]:
+              - /url: javascript:;
+            - generic [ref=e238] [cursor=pointer]: 选项2
+    - generic [ref=e239]: 提交
+  - generic [ref=e244]:
+    - link "隐私政策" [ref=e245] [cursor=pointer]:
+      - /url: javascript:;
+    - generic [ref=e248]:
+      - text: 
+      - link "问卷星" [ref=e249] [cursor=pointer]:
+        - /url: https://www.wjx.cn/
+      - text: 提供技术支持
+    - link "举报" [ref=e250] [cursor=pointer]:
+      - /url: https://www.wjx.cn/vm/Q0mluca.aspx?q1=ei3sVrE&q2=1

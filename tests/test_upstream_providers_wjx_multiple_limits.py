@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from bs4 import BeautifulSoup
+from selectolax.lexbor import LexborHTMLParser
 
 from surveycore.wjx.provider.questions import multiple_limits
 
@@ -36,8 +36,8 @@ class TestWjxMultipleLimits:
         element = _FakeElement({"minvalue": "2", "maxvalue": "6"})
         assert multiple_limits._extract_min_max_from_attributes(element) == (2, 6)
 
-    def test_extract_min_max_from_attributes_supports_beautifulsoup_tag(self) -> None:
-        element = BeautifulSoup("<div minvalue='2' maxvalue='6'></div>", "html.parser").div
+    def test_extract_min_max_from_attributes_supports_selectolax_node(self) -> None:
+        element = LexborHTMLParser("<div minvalue='2' maxvalue='6'></div>").css_first("div")
         assert multiple_limits._extract_min_max_from_attributes(element) == (2, 6)
 
     def test_extract_multi_limit_range_supports_chinese_and_english(self) -> None:

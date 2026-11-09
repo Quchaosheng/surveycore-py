@@ -3,15 +3,11 @@ import logging
 import re
 from typing import Any, List, Optional
 
-try:
-    from bs4 import BeautifulSoup
-except ImportError:
-    BeautifulSoup = None
+from selectolax.lexbor import LexborHTMLParser
 
 from surveycore.core.questions.utils import _normalize_question_type_code
 from surveycore.logging.log_utils import log_suppressed_exception
 from surveycore.providers.match_utils import normalize_match_text
-
 from .regexes import WJX_MODLEN_CLASS_RE, WJX_QUESTION_PREFIX_RE, WJX_TITLE_SUFFIX_RE
 
 _TEXT_INPUT_ALLOWED_TYPES = {"text", "tel", "email", "number", "search", "url", "password"}
@@ -79,11 +75,11 @@ def _input_looks_like_location(input_element) -> bool:
     if input_element is None:
         return False
     try:
-        verify_value = str(input_element.get("verify") or "").strip()
+        verify_value = str(input_element.attributes.get("verify") or "").strip()
     except Exception:
         verify_value = ""
     try:
-        onclick_value = str(input_element.get("onclick") or "").strip().lower()
+        onclick_value = str(input_element.attributes.get("onclick") or "").strip().lower()
     except Exception:
         onclick_value = ""
     if not verify_value and "opencitybox" not in onclick_value:
@@ -93,19 +89,19 @@ def _input_looks_like_location(input_element) -> bool:
     return "opencitybox" in onclick_value
 
 
-def _soup_question_is_required(question_div) -> bool:
+def _question_is_required(question_div) -> bool:
     if question_div is None:
         return False
     try:
-        if str(question_div.get("req") or "").strip() in {"1", "true", "True"}:
+        if str(question_div.attributes.get("req") or "").strip() in {"1", "true", "True"}:
             return True
-        if str(question_div.get("required") or "").strip().lower() in {"1", "true", "required"}:
+        if str(question_div.attributes.get("required") or "").strip().lower() in {"1", "true", "required"}:
             return True
-        if str(question_div.get("must") or "").strip() in {"1", "true", "True"}:
+        if str(question_div.attributes.get("must") or "").strip() in {"1", "true", "True"}:
             return True
-        if str(question_div.get("wjxreq") or "").strip() in {"1", "true", "True"}:
+        if str(question_div.attributes.get("wjxreq") or "").strip() in {"1", "true", "True"}:
             return True
-        if str(question_div.get("aria-required") or "").strip().lower() == "true":
+        if str(question_div.attributes.get("aria-required") or "").strip().lower() == "true":
             return True
     except Exception:
         pass
@@ -121,7 +117,7 @@ def _soup_question_is_required(question_div) -> bool:
     )
     for selector in marker_selectors:
         try:
-            if question_div.select_one(selector):
+            if question_div.css_first(selector):
                 return True
         except Exception:
             continue
@@ -134,7 +130,7 @@ def _soup_question_is_required(question_div) -> bool:
         return True
 
     try:
-        text = _normalize_html_text(question_div.get_text(" ", strip=True))
+        text = _normalize_html_text(question_div.text(separator=" ", strip=True))
     except Exception:
         text = normalized_heading
     if text.startswith("*"):
@@ -145,10 +141,8 @@ def extract_survey_title_from_html(html: str) -> Optional[str]:
     
 
 
-    if not BeautifulSoup:
-        return None
     try:
-        soup = BeautifulSoup(html, "html.parser")
+        soup = LexborHTMLParser(html)
     except Exception:
         return None
 
@@ -166,25 +160,25 @@ def extract_survey_title_from_html(html: str) -> Optional[str]:
     ]
     candidates: List[str] = []
     for selector in selectors:
-        element = soup.select_one(selector)
+        element = soup.css_first(selector)
         if element:
-            text = _normalize_html_text(element.get_text(" ", strip=True))
+            text = _normalize_html_text(element.text(separator=" ", strip=True))
             if text:
                 candidates.append(text)
 
     if not candidates:
         for tag_name in ("h1", "h2"):
-            header = soup.find(tag_name)
+            header = soup.css_first(tag_name)
             if header:
-                text = _normalize_html_text(header.get_text(" ", strip=True))
+                text = _normalize_html_text(header.text(separator=" ", strip=True))
                 if text:
                     candidates.append(text)
                 if candidates:
                     break
 
-    title_tag = soup.find("title")
+    title_tag = soup.css_first("title")
     if title_tag:
-        text = _normalize_html_text(title_tag.get_text(" ", strip=True))
+        text = _normalize_html_text(title_tag.text(separator=" ", strip=True))
         if text:
             candidates.append(text)
 
@@ -197,10 +191,10 @@ def extract_survey_title_from_html(html: str) -> Optional[str]:
     return None
 
 def _extract_question_number_from_div(question_div) -> Optional[int]:
-    topic_attr = question_div.get("topic")
+    topic_attr = question_div.attributes.get("topic")
     if topic_attr and topic_attr.isdigit():
         return int(topic_attr)
-    id_attr = question_div.get("id") or ""
+    id_attr = question_div.attributes.get("id") or ""
     match = re.search(r"div(\d+)", id_attr)
     if match:
         return int(match.group(1))
@@ -221,20 +215,20 @@ def _extract_display_heading_text(question_div) -> str:
     if question_div is None:
         return ""
     try:
-        field_label = question_div.find(class_="field-label")
+        field_label = question_div.css_first(".field-label")
     except Exception:
         field_label = None
     if field_label is not None:
         parts: List[str] = []
         for class_name in ("topicnumber", "topichtml"):
             try:
-                element = field_label.find(class_=class_name)
+                element = field_label.css_first(f".{class_name}")
             except Exception:
                 element = None
             if element is None:
                 continue
             try:
-                text = element.get_text(" ", strip=True)
+                text = element.text(separator=" ", strip=True)
             except Exception:
                 text = ""
             text = _normalize_html_text(text)
@@ -244,64 +238,64 @@ def _extract_display_heading_text(question_div) -> str:
             return _normalize_html_text(" ".join(parts))
     for class_name in ("topichtml", "field-label", "qtypetip"):
         try:
-            title_element = question_div.find(class_=class_name)
+            title_element = question_div.css_first(f".{class_name}")
         except Exception:
             title_element = None
         if not title_element:
             continue
         try:
-            text = title_element.get_text(" ", strip=True)
+            text = title_element.text(separator=" ", strip=True)
         except Exception:
             text = ""
         text = _normalize_html_text(text)
         if text:
             return text
     try:
-        blockquote = question_div.find("blockquote")
+        blockquote = question_div.css_first("blockquote")
     except Exception:
         blockquote = None
     if blockquote is not None:
         try:
-            text = blockquote.get_text(" ", strip=True)
+            text = blockquote.text(separator=" ", strip=True)
         except Exception:
             text = ""
         text = _normalize_html_text(text)
         if text:
             return text
     try:
-        text = question_div.get_text(" ", strip=True)
+        text = question_div.text(separator=" ", strip=True)
     except Exception:
         text = ""
     return _normalize_html_text(text)
 
-def _count_text_inputs_in_soup(question_div) -> int:
+def _count_text_inputs(question_div) -> int:
     try:
-        candidates = question_div.find_all(["input", "textarea", "span", "div"])
+        candidates = [
+            node
+            for node in question_div.css("input, textarea, span, div")
+            if node.mem_id != question_div.mem_id
+        ]
     except Exception as exc:
         log_suppressed_exception("survey.parser._count_text_inputs candidates", exc, level=logging.ERROR)
         return 0
     count = 0
     for cand in candidates:
         try:
-            tag_name = (cand.name or "").lower()
+            tag_name = (cand.tag or "").lower()
         except Exception:
             tag_name = ""
         input_type = ""
         try:
-            input_type = (cand.get("type") or "").lower()
+            input_type = (cand.attributes.get("type") or "").lower()
         except Exception:
             input_type = ""
         style_text = ""
         try:
-            style_text = (cand.get("style") or "").lower()
+            style_text = (cand.attributes.get("style") or "").lower()
         except Exception:
             style_text = ""
         try:
-            class_attr = cand.get("class") or []
-            if isinstance(class_attr, str):
-                class_text = class_attr.lower()
-            else:
-                class_text = " ".join(class_attr).lower()
+            class_text = str(cand.attributes.get("class") or "").lower()
         except Exception:
             class_text = ""
         is_textcont = "textcont" in class_text or "textedit" in class_text
@@ -313,9 +307,11 @@ def _count_text_inputs_in_soup(question_div) -> int:
 
         if tag_name == "input":
             try:
-                sibling = cand.find_next_sibling()
-                sibling_classes = sibling.get("class") if sibling else None
-                if sibling_classes and any("textedit" in cls.lower() for cls in sibling_classes):
+                sibling = cand.next
+                while sibling is not None and not sibling.is_element_node:
+                    sibling = sibling.next
+                sibling_classes = str(sibling.attributes.get("class") or "") if sibling else ""
+                if "textedit" in sibling_classes.lower():
                     continue
             except Exception as exc:
                 log_suppressed_exception("survey.parser._count_text_inputs sibling", exc, level=logging.ERROR)
@@ -323,7 +319,7 @@ def _count_text_inputs_in_soup(question_div) -> int:
             count += 1
             continue
         try:
-            contenteditable = (cand.get("contenteditable") or "").lower() == "true"
+            contenteditable = (cand.attributes.get("contenteditable") or "").lower() == "true"
         except Exception:
             contenteditable = False
         if (contenteditable or is_textcont) and tag_name in {"span", "div"}:
@@ -336,35 +332,41 @@ def _extract_text_input_labels(question_div) -> List[str]:
 
     def _label_before_node(node) -> str:
         parts: List[str] = []
-        current = getattr(node, "previous_sibling", None)
+        current = node.prev
         while current is not None:
-            name = str(getattr(current, "name", "") or "").lower()
+            if not current.is_element_node:
+                current = current.prev
+                continue
+            name = str(current.tag or "").lower()
             if name in {"input", "textarea", "label", "span"}:
                 if name == "input":
-                    current = getattr(current, "previous_sibling", None)
+                    current = current.prev
                     continue
                 break
             if name in {"br"}:
                 break
-            text = _normalize_html_text(current.get_text(" ", strip=True) if hasattr(current, "get_text") else str(current))
+            text = _normalize_html_text(current.text(separator=" ", strip=True))
             if text:
                 parts.append(text)
-            current = getattr(current, "previous_sibling", None)
+            current = current.prev
         return _normalize_html_text(" ".join(reversed(parts))).rstrip("：:").strip()
 
     try:
-        candidates = question_div.find_all(["input", "textarea", "span", "div"])
+        candidates = [
+            node
+            for node in question_div.css("input, textarea, span, div")
+            if node.mem_id != question_div.mem_id
+        ]
     except Exception as exc:
         log_suppressed_exception("survey.parser._extract_text_input_labels candidates", exc, level=logging.ERROR)
         return labels
 
     for cand in candidates:
         try:
-            tag_name = (cand.name or "").lower()
-            input_type = (cand.get("type") or "").lower()
-            style_text = (cand.get("style") or "").lower()
-            class_attr = cand.get("class") or []
-            class_text = " ".join(class_attr).lower() if isinstance(class_attr, list) else str(class_attr).lower()
+            tag_name = (cand.tag or "").lower()
+            input_type = (cand.attributes.get("type") or "").lower()
+            style_text = (cand.attributes.get("style") or "").lower()
+            class_text = str(cand.attributes.get("class") or "").lower()
             is_textcont = "textcont" in class_text or "textedit" in class_text
 
             if input_type == "hidden" or "display:none" in style_text or "visibility:hidden" in style_text:
@@ -373,26 +375,30 @@ def _extract_text_input_labels(question_div) -> List[str]:
                 continue
 
             if tag_name == "input":
-                sibling = cand.find_next_sibling()
-                if sibling and sibling.get("class") and any("textedit" in cls.lower() for cls in sibling.get("class")):
+                sibling = cand.next
+                while sibling is not None and not sibling.is_element_node:
+                    sibling = sibling.next
+                if sibling and "textedit" in str(sibling.attributes.get("class") or "").lower():
                     continue
 
             is_text_input = False
             if tag_name == "textarea" or (tag_name == "input" and input_type in _TEXT_INPUT_ALLOWED_TYPES):
                 is_text_input = True
-            elif (cand.get("contenteditable") == "true" or is_textcont) and tag_name in {"span", "div"}:
+            elif (cand.attributes.get("contenteditable") == "true" or is_textcont) and tag_name in {"span", "div"}:
                 is_text_input = True
 
             if is_text_input:
-                label = cand.get("placeholder") or cand.get("aria-label") or cand.get("data-label") or ""
+                label = cand.attributes.get("placeholder") or cand.attributes.get("aria-label") or cand.attributes.get("data-label") or ""
                 if not label:
-                    prev = cand.find_previous_sibling(string=True)
-                    if prev:
-                        label = prev.strip().rstrip("：:").strip()
+                    prev = cand.prev
+                    while prev is not None and not prev.is_text_node:
+                        prev = prev.prev
+                    if prev is not None:
+                        label = prev.text().strip().rstrip("：:").strip()
                 if not label:
                     label = _label_before_node(cand)
                 if not label and is_textcont:
-                    parent = cand.find_parent()
+                    parent = cand.parent
                     if parent is not None:
                         label = _label_before_node(parent)
                 labels.append(label if label else f"填空{len(labels) + 1}")
@@ -402,17 +408,17 @@ def _extract_text_input_labels(question_div) -> List[str]:
 
     return labels
 
-def _soup_question_looks_like_description(question_div, type_code: str) -> bool:
+def _question_looks_like_description(question_div, type_code: str) -> bool:
     
     if question_div is None:
         return False
     try:
-        relation = str(question_div.get("relation") or "").strip()
-        style_text = str(question_div.get("style") or "").lower()
+        relation = str(question_div.attributes.get("relation") or "").strip()
+        style_text = str(question_div.attributes.get("style") or "").lower()
         is_unreachable_placeholder = (
             relation == "-1"
             and "display:none" in style_text.replace(" ", "")
-            and not _soup_question_is_required(question_div)
+            and not _question_is_required(question_div)
         )
         if is_unreachable_placeholder:
             return True
@@ -423,17 +429,15 @@ def _soup_question_looks_like_description(question_div, type_code: str) -> bool:
         return False
     try:
         
-        choice_inputs = question_div.find_all(
-            "input", attrs={"type": lambda v: v and v.lower() in ("radio", "checkbox")}
-        )
+        choice_inputs = question_div.css("input[type='radio'], input[type='checkbox']")
         if choice_inputs:
             return False
         
-        has_control_group = bool(question_div.select_one(".ui-controlgroup"))
+        has_control_group = bool(question_div.css_first(".ui-controlgroup"))
         if has_control_group:
             return False
         
-        has_jq_controls = bool(question_div.select_one(".jqradio, .jqcheck"))
+        has_jq_controls = bool(question_div.css_first(".jqradio, .jqcheck"))
         if has_jq_controls:
             return False
     except Exception:
@@ -441,47 +445,47 @@ def _soup_question_looks_like_description(question_div, type_code: str) -> bool:
     
     return True
 
-def _soup_question_looks_like_reorder(question_div) -> bool:
+def _question_looks_like_reorder(question_div) -> bool:
     
     if question_div is None:
         return False
     try:
-        if question_div.select_one(".sortnum, .sortnum-sel, .order-number, .order-index"):
+        if question_div.css_first(".sortnum, .sortnum-sel, .order-number, .order-index"):
             return True
     except Exception as exc:
-        log_suppressed_exception("survey.parser._soup_question_looks_like_reorder quick", exc, level=logging.ERROR)
+        log_suppressed_exception("survey.parser._question_looks_like_reorder quick", exc, level=logging.ERROR)
     try:
-        has_list_items = bool(question_div.select("ul li, ol li"))
+        has_list_items = bool(question_div.css("ul li, ol li"))
         if not has_list_items:
             return False
         has_sort_signature = bool(
-            question_div.select(".ui-sortable, .ui-sortable-handle, [class*='sort']")
+            question_div.css(".ui-sortable, .ui-sortable-handle, [class*='sort']")
         )
         return has_sort_signature
     except Exception:
         return False
 
-def _soup_question_looks_like_numeric_scale(question_div) -> bool:
+def _question_looks_like_numeric_scale(question_div) -> bool:
     
     if question_div is None:
         return False
     try:
-        anchors = question_div.select("ul[tp='d'] li a, .scale-rating ul li a, .scale-rating a[val]")
+        anchors = question_div.css("ul[tp='d'] li a, .scale-rating ul li a, .scale-rating a[val]")
     except Exception:
         anchors = []
     texts: List[str] = []
     for anchor in anchors:
-        text = _normalize_html_text(anchor.get_text(" ", strip=True))
+        text = _normalize_html_text(anchor.text(separator=" ", strip=True))
         if not text:
             try:
                 text = _normalize_html_text(
-                    anchor.get("title")
-                    or anchor.get("aria-label")
-                    or anchor.get("val")
-                    or anchor.get("value")
-                    or anchor.get("dval")
-                    or anchor.get("data-value")
-                    or anchor.get("data-val")
+                    anchor.attributes.get("title")
+                    or anchor.attributes.get("aria-label")
+                    or anchor.attributes.get("val")
+                    or anchor.attributes.get("value")
+                    or anchor.attributes.get("dval")
+                    or anchor.attributes.get("data-value")
+                    or anchor.attributes.get("data-val")
                     or ""
                 )
             except Exception:
@@ -493,32 +497,32 @@ def _soup_question_looks_like_numeric_scale(question_div) -> bool:
     numeric_count = sum(1 for t in texts if re.fullmatch(r"\d{1,2}", t))
     has_scale_title = False
     try:
-        has_scale_title = bool(question_div.select_one(".scaleTitle, .scaleTitle_frist, .scaleTitle_last, .scaleTitleFirst, .scaleTitleLast"))
+        has_scale_title = bool(question_div.css_first(".scaleTitle, .scaleTitle_frist, .scaleTitle_last, .scaleTitleFirst, .scaleTitleLast"))
     except Exception:
         has_scale_title = False
     total = len(texts)
     return total >= 5 and numeric_count >= max(3, int(total * 0.7)) and (total >= 9 or has_scale_title)
 
-def _soup_question_looks_like_rating(question_div) -> bool:
+def _question_looks_like_rating(question_div) -> bool:
     
     if question_div is None:
         return False
     
-    if _soup_question_looks_like_numeric_scale(question_div):
+    if _question_looks_like_numeric_scale(question_div):
         return False
     has_rate_icon = False
     try:
-        has_rate_icon = bool(question_div.select_one("a.rate-off, a.rate-on, .rate-off, .rate-on"))
+        has_rate_icon = bool(question_div.css_first("a.rate-off, a.rate-on, .rate-off, .rate-on"))
     except Exception:
         has_rate_icon = False
     has_tag_wrap = False
     try:
-        has_tag_wrap = bool(question_div.find(class_="evaluateTagWrap"))
+        has_tag_wrap = bool(question_div.css_first(".evaluateTagWrap"))
     except Exception:
         has_tag_wrap = False
     has_iconfont = False
     try:
-        has_iconfont = bool(question_div.select_one(".scale-rating .iconfontNew, .iconfontNew"))
+        has_iconfont = bool(question_div.css_first(".scale-rating .iconfontNew, .iconfontNew"))
     except Exception:
         has_iconfont = False
 
@@ -534,26 +538,31 @@ def _extract_rating_option_count(question_div) -> int:
     if question_div is None:
         return 0
     try:
-        rating_list = question_div.find("ul", class_=WJX_MODLEN_CLASS_RE)
+        rating_list = next(
+            (
+                node
+                for node in question_div.css("ul[class]")
+                if WJX_MODLEN_CLASS_RE.search(str(node.attributes.get("class") or ""))
+            ),
+            None,
+        )
     except Exception:
         rating_list = None
     if rating_list:
         try:
-            class_attr = rating_list.get("class") or []
-            for cls in class_attr:
-                match = WJX_MODLEN_CLASS_RE.search(str(cls))
-                if match:
-                    return int(match.group("count"))
+            match = WJX_MODLEN_CLASS_RE.search(str(rating_list.attributes.get("class") or ""))
+            if match:
+                return int(match.group("count"))
         except Exception as exc:
             log_suppressed_exception("survey.parser._extract_rating_option_count modlen", exc, level=logging.ERROR)
     try:
-        options = question_div.select(".scale-rating ul li")
+        options = question_div.css(".scale-rating ul li")
         if options:
             return len(options)
     except Exception as exc:
         log_suppressed_exception("survey.parser._extract_rating_option_count scale-rating", exc, level=logging.ERROR)
     try:
-        options = question_div.select("a.rate-off, a.rate-on")
+        options = question_div.css("a.rate-off, a.rate-on")
         if options:
             return len(options)
     except Exception as exc:

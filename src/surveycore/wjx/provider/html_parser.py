@@ -1,25 +1,22 @@
 from typing import Any, Dict, List, Optional
 
+from selectolax.lexbor import LexborHTMLParser
+
 from surveycore.core.questions.utils import _should_treat_question_as_text_like
 from surveycore.providers.contracts import (
     LOGIC_PARSE_STATUS_COMPLETE,
     LOGIC_PARSE_STATUS_NONE,
 )
 
-try:
-    from bs4 import BeautifulSoup
-except ImportError:
-    BeautifulSoup = None
-
 from .html_parser_choice import (
     _extract_choice_attached_selects,
     _extract_force_select_option,
     _extract_rating_option_texts,
-    _soup_question_is_location,
+    _question_is_location,
     _text_looks_meaningful,
 )
 from .html_parser_common import (
-    _count_text_inputs_in_soup,
+    _count_text_inputs,
     _extract_display_heading_text,
     _extract_display_question_number,
     _extract_question_number_from_div,
@@ -27,10 +24,10 @@ from .html_parser_common import (
     _extract_text_input_labels,
     _normalize_html_text,
     _should_mark_as_multi_text,
-    _soup_question_is_required,
-    _soup_question_looks_like_description,
-    _soup_question_looks_like_rating,
-    _soup_question_looks_like_reorder,
+    _question_is_required,
+    _question_looks_like_description,
+    _question_looks_like_rating,
+    _question_looks_like_reorder,
     extract_survey_title_from_html,
 )
 from .html_parser_matrix import _extract_slider_range, _question_div_looks_like_slider_matrix
@@ -41,7 +38,6 @@ from .html_parser_rules import (
     _extract_question_metadata_from_html,
     _extract_question_title,
 )
-
 __all__ = ["_normalize_html_text", "extract_survey_title_from_html", "parse_survey_questions_from_html"]
 
 
@@ -84,12 +80,12 @@ def _collect_question_media(question_div, row_texts: List[str], option_texts: Li
     title_nodes: List[Any] = []
     for selector in (".topichtml", ".field-label"):
         try:
-            title_nodes.extend(list(question_div.select(selector) or []))
+            title_nodes.extend(question_div.css(selector))
         except Exception:
             continue
     for node in title_nodes:
         try:
-            images = node.select("img")
+            images = node.css("img")
         except Exception:
             images = []
         for image in images:
@@ -97,14 +93,14 @@ def _collect_question_media(question_div, row_texts: List[str], option_texts: Li
                 media,
                 scope="title",
                 index=None,
-                source_url=image.get("src") or image.get("data-src") or image.get("data-original"),
+                source_url=image.attributes.get("src") or image.attributes.get("data-src") or image.attributes.get("data-original"),
                 label="题干图",
             )
 
     option_nodes: List[Any] = []
     for selector in (".ui-controlgroup > div", "ul > li"):
         try:
-            option_nodes = list(question_div.select(selector) or [])
+            option_nodes = question_div.css(selector)
         except Exception:
             option_nodes = []
         if option_nodes:
@@ -116,7 +112,7 @@ def _collect_question_media(question_div, row_texts: List[str], option_texts: Li
             else f"选项 {option_index + 1}"
         )
         try:
-            images = node.select("img")
+            images = node.css("img")
         except Exception:
             images = []
         for image in images:
@@ -124,14 +120,14 @@ def _collect_question_media(question_div, row_texts: List[str], option_texts: Li
                 media,
                 scope="option",
                 index=option_index,
-                source_url=image.get("src") or image.get("data-src") or image.get("data-original"),
+                source_url=image.attributes.get("src") or image.attributes.get("data-src") or image.attributes.get("data-original"),
                 label=option_label or f"选项 {option_index + 1}",
             )
 
     row_nodes: List[Any] = []
     for selector in ("tr[rowindex]", "tr.rowtitletr", "tr[id^='drv']"):
         try:
-            row_nodes = list(question_div.select(selector) or [])
+            row_nodes = question_div.css(selector)
         except Exception:
             row_nodes = []
         if row_nodes:
@@ -143,7 +139,7 @@ def _collect_question_media(question_div, row_texts: List[str], option_texts: Li
             else f"第 {row_index + 1} 行"
         )
         try:
-            images = node.select("img")
+            images = node.css("img")
         except Exception:
             images = []
         for image in images:
@@ -151,7 +147,7 @@ def _collect_question_media(question_div, row_texts: List[str], option_texts: Li
                 media,
                 scope="row",
                 index=row_index,
-                source_url=image.get("src") or image.get("data-src") or image.get("data-original"),
+                source_url=image.attributes.get("src") or image.attributes.get("data-src") or image.attributes.get("data-original"),
                 label=row_label or f"第 {row_index + 1} 行",
             )
     return media
@@ -160,9 +156,9 @@ def _collect_question_media(question_div, row_texts: List[str], option_texts: Li
 def _question_div_is_initially_hidden(question_div) -> bool:
     if question_div is None:
         return False
-    style_text = str(question_div.get("style") or "").lower()
-    hidden_attr = str(question_div.get("hidden") or "").strip().lower()
-    class_text = " ".join(question_div.get("class") or []).lower() if question_div.get("class") else ""
+    style_text = str(question_div.attributes.get("style") or "").lower()
+    hidden_attr = str(question_div.attributes.get("hidden") or "").strip().lower()
+    class_text = str(question_div.attributes.get("class") or "").lower()
     return (
         "display:none" in style_text
         or "display: none" in style_text
@@ -184,9 +180,9 @@ def _question_div_or_ancestors_are_hidden(question_div) -> bool:
 
 def _question_div_has_question_ancestor(question_div, fieldset) -> bool:
     current = getattr(question_div, "parent", None)
-    while current is not None and current is not fieldset:
+    while current is not None and current.mem_id != fieldset.mem_id:
         try:
-            if current.name == "div" and current.get("topic") is not None:
+            if current.tag == "div" and current.attributes.get("topic") is not None:
                 return True
         except Exception:
             return False
@@ -196,20 +192,18 @@ def _question_div_has_question_ancestor(question_div, fieldset) -> bool:
 
 def parse_survey_questions_from_html(html: str) -> List[Dict[str, Any]]:
     
-    if not BeautifulSoup:
-        raise RuntimeError("BeautifulSoup is required for HTML parsing")
-    soup = BeautifulSoup(html, "html.parser")
-    container = soup.find("div", id="divQuestion")
+    soup = LexborHTMLParser(html)
+    container = soup.css_first("div#divQuestion")
     if not container:
         return []
-    fieldsets = container.find_all("fieldset")
+    fieldsets = container.css("fieldset")
     if not fieldsets:
         fieldsets = [container]
     questions_info: List[Dict[str, Any]] = []
     for page_index, fieldset in enumerate(fieldsets, 1):
         question_divs = [
             item
-            for item in fieldset.find_all("div", attrs={"topic": True})
+            for item in fieldset.css("div[topic]")
             if not _question_div_has_question_ancestor(item, fieldset)
         ]
         current_display_num: Optional[int] = None
@@ -222,26 +216,26 @@ def parse_survey_questions_from_html(html: str) -> List[Dict[str, Any]]:
                 if heading_num is not None:
                     current_display_num = heading_num
                 continue
-            type_code = str(question_div.get("type") or "").strip() or "0"
-            if type_code != "11" and _soup_question_looks_like_reorder(question_div):
+            type_code = str(question_div.attributes.get("type") or "").strip() or "0"
+            if type_code != "11" and _question_looks_like_reorder(question_div):
                 type_code = "11"
             if (
                 type_code == "9"
-                and str(question_div.get("gapfill") or "").strip() == "1"
-                and str(question_div.get("relation") or "").strip() in {"", "0"}
+                and str(question_div.attributes.get("gapfill") or "").strip() == "1"
+                and str(question_div.attributes.get("relation") or "").strip() in {"", "0"}
                 and _question_div_or_ancestors_are_hidden(question_div)
-                and _count_text_inputs_in_soup(question_div) == 0
+                and _count_text_inputs(question_div) == 0
             ):
                 continue
-            is_description = _soup_question_looks_like_description(question_div, type_code)
-            is_required = _soup_question_is_required(question_div)
+            is_description = _question_looks_like_description(question_div, type_code)
+            is_required = _question_is_required(question_div)
             is_rating = False
             rating_max = 0
             if type_code == "5":
-                is_rating = _soup_question_looks_like_rating(question_div)
+                is_rating = _question_looks_like_rating(question_div)
                 if is_rating:
                     rating_max = _extract_rating_option_count(question_div)
-            is_location = type_code in {"1", "2"} and _soup_question_is_location(question_div)
+            is_location = type_code in {"1", "2"} and _question_is_location(question_div)
             display_num = _extract_display_question_number(raw_heading_text)
             if display_num is None:
                 display_num = current_display_num
@@ -288,9 +282,9 @@ def parse_survey_questions_from_html(html: str) -> List[Dict[str, Any]]:
                 slider_min, slider_max, slider_step = _extract_slider_range(question_div, question_number)
             elif is_slider_matrix:
                 slider_min, slider_max, slider_step = _extract_slider_range(question_div, question_number)
-            text_input_count = _count_text_inputs_in_soup(question_div)
+            text_input_count = _count_text_inputs(question_div)
             text_input_labels = _extract_text_input_labels(question_div) if text_input_count > 1 else []
-            has_gapfill = str(question_div.get("gapfill") or "").strip() == "1"
+            has_gapfill = str(question_div.attributes.get("gapfill") or "").strip() == "1"
             is_text_like_question = _should_treat_question_as_text_like(
                 type_code,
                 option_count,

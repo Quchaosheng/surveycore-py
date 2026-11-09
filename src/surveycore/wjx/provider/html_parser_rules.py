@@ -1,10 +1,7 @@
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-try:
-    from bs4 import BeautifulSoup
-except ImportError:
-    BeautifulSoup = None
+from selectolax.lexbor import LexborHTMLParser
 
 from surveycore.providers.match_utils import normalize_match_text
 
@@ -27,14 +24,14 @@ from .regexes import WJX_JUMP_TARGET_RE, WJX_RELATION_CHUNK_RE
 
 
 def _extract_question_title(question_div, fallback_number: int) -> str:
-    title_element = question_div.find(class_="topichtml")
+    title_element = question_div.css_first(".topichtml")
     if title_element:
-        title_text = _cleanup_question_title(title_element.get_text(" ", strip=True))
+        title_text = _cleanup_question_title(title_element.text(separator=" ", strip=True))
         if title_text:
             return title_text
-    label_element = question_div.find(class_="field-label")
+    label_element = question_div.css_first(".field-label")
     if label_element:
-        title_text = _cleanup_question_title(label_element.get_text(" ", strip=True))
+        title_text = _cleanup_question_title(label_element.text(separator=" ", strip=True))
         if title_text:
             return title_text
     return f"第{fallback_number}题"
@@ -58,39 +55,33 @@ def _collect_multi_limit_text_fragments(question_div) -> List[str]:
     )
     for selector in selectors:
         try:
-            elements = question_div.select(selector)
+            elements = [
+                node
+                for node in question_div.css(selector)
+                if node.mem_id != question_div.mem_id
+            ]
         except Exception:
             elements = []
         for element in elements:
             try:
-                text = _normalize_html_text(element.get_text(" ", strip=True))
+                text = _normalize_html_text(element.text(separator=" ", strip=True))
             except Exception:
                 text = ""
             if text:
                 fragments.append(text)
 
-    if BeautifulSoup is not None:
-        try:
-            cloned_soup = BeautifulSoup(str(question_div), "html.parser")
-            for selector in (
-                ".ui-controlgroup",
-                "ul",
-                "ol",
-                "table",
-                "textarea",
-                "select",
-                ".slider",
-                ".rangeslider",
-                ".range-slider",
-                ".errorMessage",
-            ):
-                for element in cloned_soup.select(selector):
-                    element.decompose()
-            cleaned_text = _normalize_html_text(cloned_soup.get_text(" ", strip=True))
-            if cleaned_text:
-                fragments.append(cleaned_text)
-        except Exception:
-            pass
+    excluded = ".ui-controlgroup, ul, ol, table, textarea, select, .slider, .rangeslider, .range-slider, .errorMessage"
+    clone = LexborHTMLParser(question_div.html)
+    elements = clone.css(excluded)
+    excluded_ids = {element.mem_id for element in elements}
+    for element in elements:
+        ancestor = element.parent
+        if ancestor is not None and ancestor.mem_id in excluded_ids:
+            continue
+        element.decompose()
+    cleaned_text = _normalize_html_text(clone.root.text(separator=" ", strip=True))
+    if cleaned_text:
+        fragments.append(cleaned_text)
 
     deduped: List[str] = []
     seen = set()
@@ -129,7 +120,7 @@ def _extract_multiple_choice_limits(question_div, question_number: int) -> Tuple
         if min_limit is None or max_limit is None:
             for attr_name in ("data", "data-setting", "data-validate"):
                 try:
-                    attr_value = question_div.get(attr_name)
+                    attr_value = question_div.attributes.get(attr_name)
                 except Exception:
                     attr_value = None
                 cand_min, cand_max = _extract_range_from_possible_json(attr_value)
@@ -191,7 +182,7 @@ def _extract_question_metadata_from_html(soup, question_div, question_number: in
 def _extract_jump_rules_from_html(question_div, question_number: int, option_texts: List[str]) -> Tuple[bool, List[Dict[str, Any]]]:
     
     _ = question_number
-    has_jump_attr = str(question_div.get("hasjump") or "").strip() == "1"
+    has_jump_attr = str(question_div.attributes.get("hasjump") or "").strip() == "1"
     jump_rules: List[Dict[str, Any]] = []
     terminate_keywords = ("结束作答", "结束答题", "结束填写", "终止作答", "停止作答")
 
@@ -215,22 +206,22 @@ def _extract_jump_rules_from_html(question_div, question_number: int, option_tex
         return int(jumpto_num or 0) in {1, -1}
 
     selectable_nodes = []
-    for input_el in question_div.find_all("input"):
-        input_type = (input_el.get("type") or "").lower()
+    for input_el in question_div.css("input"):
+        input_type = (input_el.attributes.get("type") or "").lower()
         if input_type in ("radio", "checkbox"):
             selectable_nodes.append(input_el)
 
     if not selectable_nodes:
-        for option_index, option_el in enumerate(question_div.find_all("option")):
-            option_text = _normalize_html_text(option_el.get_text(" ", strip=True))
-            option_value = option_el.get("value")
+        for option_index, option_el in enumerate(question_div.css("option")):
+            option_text = _normalize_html_text(option_el.text(separator=" ", strip=True))
+            option_value = option_el.attributes.get("value")
             if _is_select_placeholder_option(option_index, option_value, option_text):
                 continue
             selectable_nodes.append(option_el)
 
     option_idx = 0
     for selectable_node in selectable_nodes:
-        jumpto_raw = selectable_node.get("jumpto") or selectable_node.get("data-jumpto")
+        jumpto_raw = selectable_node.attributes.get("jumpto") or selectable_node.attributes.get("data-jumpto")
         if not jumpto_raw:
             option_idx += 1
             continue
@@ -248,7 +239,7 @@ def _extract_jump_rules_from_html(question_div, question_number: int, option_tex
     if has_jump_attr:
         unconditional_target = None
         for attr_name in ("jumpto", "data-jumpto", "goto", "data-goto", "anyjump", "data-anyjump"):
-            unconditional_target = _parse_jump_target(question_div.get(attr_name))
+            unconditional_target = _parse_jump_target(question_div.attributes.get(attr_name))
             if unconditional_target:
                 break
         if unconditional_target and not any(
@@ -266,7 +257,7 @@ def _extract_jump_rules_from_html(question_div, question_number: int, option_tex
 def _extract_display_conditions_from_html(question_div, question_number: int) -> Tuple[bool, List[Dict[str, Any]]]:
     
     _ = question_number
-    relation_raw = str(question_div.get("relation") or "").strip()
+    relation_raw = str(question_div.attributes.get("relation") or "").strip()
     if not relation_raw:
         return False, []
 
