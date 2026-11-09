@@ -47,12 +47,15 @@ def build_reverse_fill_action(
         )
     if question_type == "multiple":
         indexes = tuple(answer.choice_indexes)
+        min_required = max(1, int(question.multi_min_limit or 1))
+        max_allowed = int(question.multi_max_limit or option_count)
         if (
             answer.kind != REVERSE_FILL_KIND_CHOICES
-            or not indexes
+            or len(set(indexes)) != len(indexes)
             or any(not 0 <= index < option_count for index in indexes)
+            or not min_required <= len(indexes) <= max_allowed
         ):
-            raise ValueError(f"第{current}题反填多选类型或选项超出范围")
+            raise ValueError(f"第{current}题反填多选选项或选择数量不匹配")
         return AnswerAction(
             question_num=current,
             kind="choice",

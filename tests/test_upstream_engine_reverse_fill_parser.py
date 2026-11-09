@@ -146,3 +146,37 @@ class TestReverseFillParser:
     def test_supports_reverse_fill_runtime_accepts_plain_multiple_choice(self) -> None:
         assert supports_reverse_fill_runtime("multiple", {"option_texts": ["A", "B"]})
         assert not supports_reverse_fill_runtime("multiple", {"fillable_options": [1]})
+
+    def test_multiple_text_prefers_full_labels_over_aliases(self) -> None:
+        answer = parse_multiple_answer(
+            question_num=5, raw_value="不适用┋其他",
+            export_format=REVERSE_FILL_FORMAT_WJX_TEXT,
+            option_texts=["不了解/不适用", "不适用", "其他"],
+        )
+        assert answer is not None
+        assert answer.choice_indexes == [1, 2]
+
+    def test_single_text_prefers_full_labels_over_aliases(self) -> None:
+        answer = parse_choice_answer(
+            question_num=1, question_type="single", raw_value="不适用",
+            export_format=REVERSE_FILL_FORMAT_WJX_TEXT,
+            option_texts=["不了解/不适用", "不适用"],
+        )
+        assert answer is not None
+        assert answer.choice_index == 1
+
+    @pytest.mark.parametrize("options", [["甲/同名", "乙/同名"], ["同名", "同名"]])
+    def test_multiple_text_rejects_ambiguous_labels(self, options) -> None:
+        with pytest.raises(ValueError, match="多个题目选项"):
+            parse_multiple_answer(
+                question_num=5, raw_value="同名", export_format=REVERSE_FILL_FORMAT_WJX_TEXT,
+                option_texts=options,
+            )
+
+    @pytest.mark.parametrize("value", ["┋", "1┋", "┋1", "1┋┋2"])
+    def test_multiple_answer_rejects_empty_parts(self, value) -> None:
+        with pytest.raises(ValueError, match="空选项"):
+            parse_multiple_answer(
+                question_num=5, raw_value=value, export_format=REVERSE_FILL_FORMAT_WJX_SEQUENCE,
+                option_texts=["甲", "乙"],
+            )

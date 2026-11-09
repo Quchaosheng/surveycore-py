@@ -15,7 +15,7 @@ from surveycore.core.reverse_fill.schema import (
 )
 
 _QUESTION_HEADER_RE = re.compile(r"^\s*(\d+)\s*[、,.，．]\s*(.*?)\s*$")
-_SEQUENCE_SUFFIX_RE = re.compile(r"^\(\s*选项\s*\d+\s*\)$")
+_SEQUENCE_SUFFIX_RE = re.compile(r"[（(]\s*选项\s*\d+\s*[)）]\s*$")
 
 
 def _cell_text(value: Any) -> str:
@@ -27,9 +27,7 @@ def _cell_text(value: Any) -> str:
 
 def _detect_wjx_export_format(question_columns: Dict[int, List[ReverseFillColumn]], raw_rows: List[ReverseFillRawRow]) -> str:
     for columns in question_columns.values():
-        if len(columns) <= 1:
-            continue
-        if any(_SEQUENCE_SUFFIX_RE.match(column.suffix) for column in columns):
+        if any(_SEQUENCE_SUFFIX_RE.search(column.suffix) for column in columns):
             return REVERSE_FILL_FORMAT_WJX_SEQUENCE
 
     for row in raw_rows[:5]:
