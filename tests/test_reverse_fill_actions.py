@@ -47,6 +47,7 @@ def _state_with_answer(answer: ReverseFillAnswer, question_type: str) -> Executi
         ("text", ReverseFillAnswer(1, "text", text_value="张三"), "1$张三"),
         ("multi_text", ReverseFillAnswer(1, "multi_text", text_values=["张三", ""]), "1$张三^"),
         ("matrix", ReverseFillAnswer(1, "matrix", matrix_choice_indexes=[1, 2]), "1$1!2,2!3"),
+        ("multiple", ReverseFillAnswer(1, "choices", choice_indexes=[0, 2]), "1$1|3"),
     ],
 )
 async def test_reverse_fill_overrides_generation_and_builds_submitdata(
@@ -94,6 +95,8 @@ async def test_missing_reverse_answer_uses_regular_question_config() -> None:
         ("matrix", ReverseFillAnswer(1, "matrix", matrix_choice_indexes=[0])),
         ("matrix", ReverseFillAnswer(1, "matrix", matrix_choice_indexes=[0, 3])),
         ("multiple", ReverseFillAnswer(1, "choice", choice_index=0)),
+        ("multiple", ReverseFillAnswer(1, "choices", choice_indexes=[])),
+        ("multiple", ReverseFillAnswer(1, "choices", choice_indexes=[0, 3])),
     ],
 )
 def test_changed_question_shape_or_unsupported_type_is_rejected(

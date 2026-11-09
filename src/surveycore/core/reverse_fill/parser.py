@@ -10,6 +10,7 @@ from surveycore.core.reverse_fill.schema import (
     REVERSE_FILL_FORMAT_WJX_SEQUENCE,
     REVERSE_FILL_FORMAT_WJX_TEXT,
     REVERSE_FILL_KIND_CHOICE,
+    REVERSE_FILL_KIND_CHOICES,
     REVERSE_FILL_KIND_MATRIX,
     REVERSE_FILL_KIND_MULTI_TEXT,
     REVERSE_FILL_KIND_TEXT,
@@ -86,7 +87,7 @@ def supports_reverse_fill_runtime(question_type: str, info: SurveyQuestionMeta |
         return False
     if normalized == "text" and bool(info.get("is_location")):
         return False
-    if normalized in {"single", "dropdown"}:
+    if normalized in {"single", "dropdown", "multiple"}:
         if info.get("fillable_options") or info.get("attached_option_selects"):
             return False
     return True
@@ -174,6 +175,37 @@ def _option_text_index_map(option_texts: Iterable[Any]) -> Dict[str, int]:
     return mapping
 
 
+def _resolve_choice_index(
+    *,
+    raw_value: Any,
+    export_format: str,
+    option_map: Dict[str, int],
+    option_texts: List[Any],
+) -> int:
+    text = normalize_reverse_fill_text(raw_value)
+    if export_format == REVERSE_FILL_FORMAT_WJX_SEQUENCE:
+        one_based = _parse_one_based_index(raw_value)
+        if one_based is None:
+            raise ValueError(f"无法把值“{text}”解析为序号")
+        zero_based = one_based - 1
+        if zero_based < 0 or zero_based >= len(option_texts):
+            raise ValueError(f"序号 {one_based} 超出选项范围")
+        return zero_based
+
+    for variant in label_variants(raw_value):
+        if variant in option_map:
+            return int(option_map[variant])
+
+    if export_format in {REVERSE_FILL_FORMAT_WJX_SCORE, REVERSE_FILL_FORMAT_WJX_TEXT}:
+        one_based = _parse_one_based_index(raw_value)
+        if one_based is not None:
+            zero_based = one_based - 1
+            if 0 <= zero_based < len(option_texts):
+                return zero_based
+
+    raise ValueError(f"无法把值“{text}”匹配到题目选项")
+
+
 def parse_choice_answer(
     *,
     question_num: int,
@@ -187,33 +219,48 @@ def parse_choice_answer(
         return None
     text = normalize_reverse_fill_text(raw_value)
     _ensure_supported_choice_value(text)
+    choice_index = _resolve_choice_index(
+        raw_value=raw_value,
+        export_format=export_format,
+        option_map=_option_text_index_map(option_texts),
+        option_texts=option_texts,
+    )
+    return ReverseFillAnswer(
+        question_num=question_num, kind=REVERSE_FILL_KIND_CHOICE, choice_index=choice_index
+    )
 
-    if export_format == REVERSE_FILL_FORMAT_WJX_SEQUENCE:
-        one_based = _parse_one_based_index(raw_value)
-        if one_based is None:
-            raise ValueError(f"无法把值“{text}”解析为序号")
-        zero_based = one_based - 1
-        if zero_based < 0 or zero_based >= len(option_texts):
-            raise ValueError(f"序号 {one_based} 超出选项范围")
-        return ReverseFillAnswer(question_num=question_num, kind=REVERSE_FILL_KIND_CHOICE, choice_index=zero_based)
 
+def parse_multiple_answer(
+    *,
+    question_num: int,
+    raw_value: Any,
+    export_format: str,
+    option_texts: List[Any],
+) -> Optional[ReverseFillAnswer]:
+    """Parse a WJX multi-select cell (options joined by ┋) into selected option indexes."""
+    if is_reverse_fill_blank(raw_value):
+        return None
     option_map = _option_text_index_map(option_texts)
-    for variant in label_variants(raw_value):
-        if variant in option_map:
-            return ReverseFillAnswer(
-                question_num=question_num,
-                kind=REVERSE_FILL_KIND_CHOICE,
-                choice_index=int(option_map[variant]),
-            )
-
-    if export_format in {REVERSE_FILL_FORMAT_WJX_SCORE, REVERSE_FILL_FORMAT_WJX_TEXT}:
-        one_based = _parse_one_based_index(raw_value)
-        if one_based is not None:
-            zero_based = one_based - 1
-            if 0 <= zero_based < len(option_texts):
-                return ReverseFillAnswer(question_num=question_num, kind=REVERSE_FILL_KIND_CHOICE, choice_index=zero_based)
-
-    raise ValueError(f"无法把值“{text}”匹配到题目选项")
+    indexes: List[int] = []
+    for part in str(normalize_reverse_fill_text(raw_value)).split("┋"):
+        if not part.strip():
+            continue
+        _ensure_supported_choice_value(part)
+        index = _resolve_choice_index(
+            raw_value=part,
+            export_format=export_format,
+            option_map=option_map,
+            option_texts=option_texts,
+        )
+        if index not in indexes:
+            indexes.append(index)
+    if not indexes:
+        return None
+    return ReverseFillAnswer(
+        question_num=question_num,
+        kind=REVERSE_FILL_KIND_CHOICES,
+        choice_indexes=sorted(indexes),
+    )
 
 
 def parse_text_answer(*, question_num: int, raw_value: Any) -> Optional[ReverseFillAnswer]:

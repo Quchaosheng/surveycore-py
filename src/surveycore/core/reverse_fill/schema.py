@@ -21,6 +21,7 @@ REVERSE_FILL_STATUS_FALLBACK = "fallback_config"
 REVERSE_FILL_STATUS_BLOCKED = "blocked"
 
 REVERSE_FILL_KIND_CHOICE = "choice"
+REVERSE_FILL_KIND_CHOICES = "choices"
 REVERSE_FILL_KIND_TEXT = "text"
 REVERSE_FILL_KIND_MULTI_TEXT = "multi_text"
 REVERSE_FILL_KIND_MATRIX = "matrix"
@@ -33,6 +34,7 @@ REVERSE_FILL_RUNTIME_SUPPORTED_TYPES = {
     "text",
     "multi_text",
     "matrix",
+    "multiple",
 }
 
 
@@ -80,6 +82,7 @@ class ReverseFillAnswer:
     text_value: str = ""
     text_values: List[str] = field(default_factory=list)
     matrix_choice_indexes: List[int] = field(default_factory=list)
+    choice_indexes: List[int] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

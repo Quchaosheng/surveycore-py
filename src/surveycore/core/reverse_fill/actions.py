@@ -6,6 +6,7 @@ from surveycore.providers.contracts import SurveyQuestionMeta
 from .parser import supports_reverse_fill_runtime
 from .schema import (
     REVERSE_FILL_KIND_CHOICE,
+    REVERSE_FILL_KIND_CHOICES,
     REVERSE_FILL_KIND_MATRIX,
     REVERSE_FILL_KIND_MULTI_TEXT,
     REVERSE_FILL_KIND_TEXT,
@@ -43,6 +44,24 @@ def build_reverse_fill_action(
             raise ValueError(f"第{current}题反填填空数量不匹配")
         return AnswerAction(
             question_num=current, kind="text", text_values=values, record_type="text"
+        )
+    if question_type == "multiple":
+        indexes = tuple(answer.choice_indexes)
+        if (
+            answer.kind != REVERSE_FILL_KIND_CHOICES
+            or not indexes
+            or any(not 0 <= index < option_count for index in indexes)
+        ):
+            raise ValueError(f"第{current}题反填多选类型或选项超出范围")
+        return AnswerAction(
+            question_num=current,
+            kind="choice",
+            input_type="checkbox",
+            selected_indices=indexes,
+            selected_texts=tuple(
+                question.option_texts[index] for index in indexes if index < len(question.option_texts)
+            ),
+            record_type="multiple",
         )
     indexes = tuple(answer.matrix_choice_indexes)
     if (
