@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import random
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import aclosing
 from dataclasses import replace
 from typing import Any
@@ -171,7 +171,7 @@ class SurveyClient:
             return SubmissionResult(0, provider, False, time.perf_counter() - started, str(exc) or "提交失败")
         return SubmissionResult(0, provider, bool(success), time.perf_counter() - started, None if success else "平台未确认提交成功")
 
-    async def run(self, config: RunConfig) -> AsyncIterator[SubmissionResult]:
+    async def run(self, config: RunConfig) -> AsyncGenerator[SubmissionResult, None]:
         survey = await self.parse(config.url)
         async def attempt(index: int) -> SubmissionResult:
             if index > 1:

@@ -79,7 +79,7 @@ def _collect_multi_limit_text_fragments(question_div) -> List[str]:
         if ancestor is not None and ancestor.mem_id in excluded_ids:
             continue
         element.decompose()
-    cleaned_text = _normalize_html_text(clone.root.text(separator=" ", strip=True))
+    cleaned_text = _normalize_html_text(clone.text(separator=" ", strip=True))
     if cleaned_text:
         fragments.append(cleaned_text)
 
