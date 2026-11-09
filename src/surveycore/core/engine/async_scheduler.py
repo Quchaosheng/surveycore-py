@@ -31,7 +31,7 @@ class AsyncScheduler:
             self._ready.append(token_id)
 
     async def start(self) -> None:
-        if self._waker_task is None:
+        if not self._closed and self._waker_task is None:
             self._waker_task = asyncio.create_task(self._wake_delayed_tokens(), name="AsyncSchedulerWake")
 
     async def acquire(self) -> Optional[int]:

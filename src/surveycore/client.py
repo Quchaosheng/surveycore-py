@@ -4,6 +4,7 @@ import asyncio
 import random
 import time
 from collections.abc import AsyncIterator
+from contextlib import aclosing
 from dataclasses import replace
 from typing import Any
 
@@ -180,8 +181,9 @@ class SurveyClient:
             result = await self.submit(SubmissionRequest(config=replace(config, target=1), survey=survey))
             return replace(result, attempt=index)
 
-        async for result in completed_results(config.target, config.concurrency, attempt):
-            yield result
+        async with aclosing(completed_results(config.target, config.concurrency, attempt)) as results:
+            async for result in results:
+                yield result
 
 
 __all__ = ["SurveyClient"]

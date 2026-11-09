@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from types import SimpleNamespace
 from typing import Any, cast
 
@@ -1600,7 +1601,8 @@ async def test_qq_http_runtime_uses_latest_dynamic_ids_for_score_questions(monke
 
 
 @pytest.mark.asyncio
-async def test_credamo_http_runtime_uses_proxy_and_posts_json(monkeypatch) -> None:
+@pytest.mark.parametrize("stop_before_save", [False, True])
+async def test_credamo_http_runtime_uses_proxy_and_posts_json(monkeypatch, stop_before_save) -> None:
     config = ExecutionConfig(
         url="https://www.credamo.com/s/A73QR3ano",
         survey_provider="credamo",
@@ -1613,6 +1615,11 @@ async def test_credamo_http_runtime_uses_proxy_and_posts_json(monkeypatch) -> No
     config.single_prob = [[1.0, 0.0]]
     state = ExecutionState(config=config)
     captured = SimpleNamespace(session_proxies=[], post_kwargs=None)
+    stopped = asyncio.Event()
+
+    async def lease():
+        stopped.set()
+        await asyncio.sleep(0)
 
     class FakeSession:
         def __init__(self, proxy_address=None):
@@ -1665,8 +1672,15 @@ async def test_credamo_http_runtime_uses_proxy_and_posts_json(monkeypatch) -> No
         state,
         proxy_address="http://1.1.1.1:80",
         user_agent="UA",
+        stop_signal=stopped,
+        submit_proxy_lease_factory=lease if stop_before_save else None,
     )
 
+    if stop_before_save:
+        assert ok is False
+        assert captured.session_proxies == [None, None]
+        assert captured.post_kwargs is None
+        return
     assert ok is True
     assert captured.session_proxies == [None, None, "http://1.1.1.1:80"]
     assert captured.post_kwargs["user_agent"] == "UA"
@@ -1990,14 +2004,12 @@ async def test_wjx_http_runtime_clears_prefill_cache_on_error(monkeypatch) -> No
     async def fake_load(*_args, **_kwargs):
         return "<html><body><input type='hidden' value='2026/5/30 1:23:18' id='starttime' name='starttime' /></body></html>"
 
-    async def fake_prefill(_questions, ctx, *, thread_name=""):
-        ctx.set_free_ai_prefill_answers(thread_name, {1: ("缓存答案",)})
+    state.set_free_ai_prefill_answers("slot-3", {1: ("缓存答案",)})
 
     async def fake_build_action(*_args, **_kwargs):
         raise RuntimeError("boom")
 
     monkeypatch.setattr(wjx_http, "_load_wjx_page", fake_load)
-    monkeypatch.setattr(wjx_http, "prefill_free_ai_answers_for_questions", fake_prefill)
     monkeypatch.setattr(wjx_http, "build_answer_action", fake_build_action)
 
     with pytest.raises(RuntimeError, match="boom"):

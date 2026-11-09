@@ -1,5 +1,5 @@
 import random
-import threading
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
@@ -203,19 +203,19 @@ def generate_persona() -> Persona:
 
 
 
-_thread_local = threading.local()
+_current_persona: ContextVar[Optional[Persona]] = ContextVar("surveycore_persona", default=None)
 
 
 def set_current_persona(persona: Persona) -> None:
     
-    _thread_local.persona = persona
+    _current_persona.set(persona)
 
 
 def get_current_persona() -> Optional[Persona]:
     
-    return getattr(_thread_local, "persona", None)
+    return _current_persona.get()
 
 
 def reset_persona() -> None:
     
-    _thread_local.persona = None
+    _current_persona.set(None)

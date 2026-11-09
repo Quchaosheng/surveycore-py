@@ -1,7 +1,7 @@
 import logging
 import math
 import random
-import threading
+from contextvars import ContextVar
 from typing import Any, Dict, List, Optional, Union
 
 from surveycore.app.config import DIMENSION_UNGROUPED
@@ -9,14 +9,16 @@ from surveycore.core.questions.reliability_mode import get_reliability_profile
 from surveycore.core.questions.utils import weighted_index
 from surveycore.logging.log_utils import log_suppressed_exception
 
-_thread_local = threading.local()
+_dimension_bases: ContextVar[Optional[Dict[str, float]]] = ContextVar(
+    "surveycore_dimension_bases", default=None
+)
 
 _SMALL_SCALE_STATIC_MAX_OPTIONS = 3
 
 
 def reset_tendency() -> None:
     
-    _thread_local.dimension_bases = {}
+    _dimension_bases.set({})
 
 
 def _generate_base_ratio(
@@ -206,10 +208,10 @@ def get_tendency_index(
 
     
     assert dimension is not None  
-    bases: Dict[str, float] = getattr(_thread_local, 'dimension_bases', {})
-    if not isinstance(bases, dict):
+    bases = _dimension_bases.get()
+    if bases is None:
         bases = {}
-        _thread_local.dimension_bases = bases
+        _dimension_bases.set(bases)
 
     base_ratio = bases.get(dimension)
 

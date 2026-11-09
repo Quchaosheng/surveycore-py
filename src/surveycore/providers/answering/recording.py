@@ -13,6 +13,7 @@ def record_answer_action(
     record_answer_fn: Callable[..., Any],
     record_pending_distribution_choice_fn: Callable[..., Any],
     default_fill_text: str,
+    thread_name: str | None = None,
 ) -> None:
     current = int(action.question_num or 0)
     if current <= 0:
@@ -25,6 +26,7 @@ def record_answer_action(
             int(option_index),
             int(option_count),
             row_index=row_index,
+            thread_name=thread_name,
         )
     if record_type == "matrix":
         for row_index, selected_index in enumerate(action.matrix_indices):

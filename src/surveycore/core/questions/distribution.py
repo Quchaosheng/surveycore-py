@@ -130,6 +130,7 @@ def record_pending_distribution_choice(
     option_count: int,
     *,
     row_index: Optional[int] = None,
+    thread_name: Optional[str] = None,
 ) -> None:
     if ctx is None or question_index is None or option_count <= 0:
         return
@@ -142,6 +143,7 @@ def record_pending_distribution_choice(
             build_distribution_stat_key(question_index, row_index),
             option_index,
             option_count,
+            thread_name=thread_name,
         )
     except Exception:
         return

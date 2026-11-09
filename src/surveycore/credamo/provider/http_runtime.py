@@ -871,6 +871,8 @@ async def brush_credamo_http(
     if submit_proxy_lease_factory is not None:
         submit_proxy_lease = await submit_proxy_lease_factory()
         submit_proxy_address = str(getattr(submit_proxy_lease, "address", "") or "").strip() or None
+    if stop_signal is not None and stop_signal.is_set():
+        return False
     if bool(getattr(config, "random_proxy_ip_enabled", False)) and not submit_proxy_address:
         raise SubmitProxyUnavailableError("提交前未获取到随机 IP")
     try:

@@ -16,7 +16,7 @@ class _FakeCtx:
         return self._counts
 
     def append_pending_distribution_choice(
-        self, stat_key: str, option_index: int, option_count: int
+        self, stat_key: str, option_index: int, option_count: int, thread_name: str | None = None
     ) -> None:
         self.append_calls.append((stat_key, option_index, option_count))
 

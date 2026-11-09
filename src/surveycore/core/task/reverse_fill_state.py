@@ -87,6 +87,8 @@ class ReverseFillRuntimeMixin:
         timeout_seconds: float = 0.5,
     ) -> ReverseFillAcquireResult:
         while True:
+            if stop_signal is not None and stop_signal.is_set():
+                return ReverseFillAcquireResult(status="waiting", message="stopped")
             result = self.acquire_reverse_fill_sample(thread_name)
             if result.status != "waiting":
                 return result

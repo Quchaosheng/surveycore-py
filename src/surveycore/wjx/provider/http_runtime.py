@@ -12,10 +12,7 @@ from urllib.parse import urlparse
 
 import surveycore.network.http as http_client
 from surveycore.app.config import DEFAULT_HTTP_HEADERS, DEFAULT_USER_AGENT, USER_AGENT_PRESETS
-from surveycore.core.ai.batch_runtime import (
-    assert_no_free_ai_placeholders_in_actions,
-    prefill_free_ai_answers_for_questions,
-)
+from surveycore.core.ai.batch_runtime import assert_no_free_ai_placeholders_in_actions
 from surveycore.core.modes.duration_control import sample_answer_duration_seconds
 from surveycore.core.persona.context import record_answer
 from surveycore.core.questions.distribution import record_pending_distribution_choice
@@ -281,13 +278,14 @@ def _submitdata_from_actions(
     return "}".join(parts)
 
 
-def _record_action(ctx: ExecutionState, action: AnswerAction) -> None:
+def _record_action(ctx: ExecutionState, action: AnswerAction, thread_name: str = "") -> None:
     record_answer_action(
         ctx,
         action,
         record_answer_fn=record_answer,
         record_pending_distribution_choice_fn=record_pending_distribution_choice,
         default_fill_text="",
+        thread_name=thread_name,
     )
 
 
@@ -411,31 +409,23 @@ async def _build_action_plan(
     async def _build_action(question: SurveyQuestionMeta) -> AnswerAction | None:
         if stop_signal is not None and stop_signal.is_set():
             return None
-        return await build_answer_action(
+        action = await build_answer_action(
             None,
             question,
             ctx,
             psycho_plan=psycho_plan,
             thread_name=thread_name,
-            allow_ai_placeholder=True,
+            allow_ai_placeholder=False,
         )
+        if action is not None:
+            _record_action(ctx, action, thread_name)
+        return action
 
     plan = await build_http_logic_plan(
         questions,
         build_action=_build_action,
     )
-    actions = list(plan.actions)
-    await prefill_free_ai_answers_for_questions(
-        questions,
-        actions,
-        ctx,
-        thread_name=thread_name,
-    )
-    return HttpLogicPlan(
-        actions=tuple(actions),
-        skipped_question_nums=plan.skipped_question_nums,
-        terminated_early=plan.terminated_early,
-    )
+    return plan
 
 
 def _sample_ktimes(config: ExecutionConfig) -> int:
@@ -489,8 +479,6 @@ async def brush_wjx_http(
         if not actions:
             return False
         assert_no_free_ai_placeholders_in_actions(actions, provider_label="问卷星")
-        for action in actions:
-            _record_action(ctx, action)
         submitdata = _submitdata_from_actions(
             actions,
             questions=_question_items(config),
@@ -536,6 +524,8 @@ async def brush_wjx_http(
         if submit_proxy_lease_factory is not None:
             submit_proxy_lease = await submit_proxy_lease_factory()
             submit_proxy_address = str(getattr(submit_proxy_lease, "address", "") or "").strip() or None
+        if stop_signal is not None and stop_signal.is_set():
+            return False
         if bool(getattr(config, "random_proxy_ip_enabled", False)) and not submit_proxy_address:
             raise SubmitProxyUnavailableError("提交前未获取到随机 IP")
         submit_proxies = _proxy_arg(submit_proxy_address)

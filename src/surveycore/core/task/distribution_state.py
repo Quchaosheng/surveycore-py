@@ -222,6 +222,10 @@ class DistributionRuntimeMixin:
         timeout_seconds: float = 0.5,
     ) -> Optional[int]:
         while True:
+            if stop_signal is not None and stop_signal.is_set():
+                return None
+            if sample_count <= 0 or self.is_joint_sample_quota_exhausted(sample_count):
+                return None
             reserved = self.reserve_joint_sample(sample_count, thread_name=thread_name)
             if reserved is not None:
                 return reserved

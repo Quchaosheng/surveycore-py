@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import logging
-import threading
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 from surveycore.core.persona.context import get_answered
 from surveycore.providers.contracts import SurveyQuestionMeta, ensure_survey_question_meta
 
-_thread_local = threading.local()
 _CONDITION_MODES = {"selected", "not_selected"}
 _ACTION_MODES = {"must_select", "must_not_select"}
 _SUPPORTED_RULE_TYPE_CODES = {"3", "4", "5", "6"}
@@ -25,6 +24,11 @@ class AnswerRule:
     target_option_indices: List[int]
     condition_row_index: Optional[int] = None  
     target_row_index: Optional[int] = None     
+
+
+_answer_rules: ContextVar[Optional[List[AnswerRule]]] = ContextVar(
+    "surveycore_answer_rules", default=None
+)
 
 
 def _to_int(value: Any, default: int = 0) -> int:
@@ -181,11 +185,11 @@ def reset_consistency_context(
         normalized = _normalize_rule(item)
         if normalized:
             parsed_rules.append(normalized)
-    _thread_local.answer_rules = parsed_rules
+    _answer_rules.set(parsed_rules)
 
 
 def _get_answer_rules() -> List[AnswerRule]:
-    rules = getattr(_thread_local, "answer_rules", None)
+    rules = _answer_rules.get()
     if not rules:
         return []
     return list(rules)

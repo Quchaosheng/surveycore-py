@@ -24,11 +24,11 @@ from surveycore.providers.hooks import (
 
 def _resolve_provider(*, provider: Optional[str] = None, ctx: Any = None) -> str:
     if provider is not None:
-        return normalize_survey_provider(provider, default=SURVEY_PROVIDER_WJX)
+        return normalize_survey_provider(provider, default="")
     if ctx is not None:
         return normalize_survey_provider(
             getattr(getattr(ctx, "config", ctx), "survey_provider", None),
-            default=SURVEY_PROVIDER_WJX,
+            default="",
         )
     return SURVEY_PROVIDER_WJX
 
@@ -85,10 +85,10 @@ _PROVIDER_REGISTRY = {
 def _get_provider_adapter(*, provider: Optional[str] = None, ctx: Any = None, url: Optional[str] = None):
     resolved = _resolve_provider(provider=provider, ctx=ctx)
     if url:
-        resolved = detect_survey_provider(url)
+        resolved = detect_survey_provider(url, default="")
     adapter = _PROVIDER_REGISTRY.get(resolved)
     if adapter is None:
-        raise RuntimeError(f"不支持的问卷 provider: {resolved}")
+        raise RuntimeError(f"不支持的问卷 provider: {url or provider or resolved}")
     return adapter
 
 

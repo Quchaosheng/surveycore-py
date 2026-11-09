@@ -1,5 +1,5 @@
 import logging
-import threading
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
@@ -19,7 +19,9 @@ class AnsweredQuestion:
 
 
 
-_thread_local = threading.local()
+_answered: ContextVar[Optional[Dict[int, AnsweredQuestion]]] = ContextVar(
+    "surveycore_answered", default=None
+)
 
 
 PERSONA_BOOST_FACTOR = 3.0
@@ -27,7 +29,7 @@ PERSONA_BOOST_FACTOR = 3.0
 
 def reset_context() -> None:
     
-    _thread_local.answered = {}
+    _answered.set({})
 
 
 def record_answer(
@@ -39,10 +41,10 @@ def record_answer(
     row_index: Optional[int] = None,
 ) -> None:
     
-    ctx = getattr(_thread_local, "answered", None)
+    ctx = _answered.get()
     if ctx is None:
-        _thread_local.answered = {}
-        ctx = _thread_local.answered
+        ctx = {}
+        _answered.set(ctx)
     if row_index is not None:
         
         if question_num not in ctx:
@@ -63,7 +65,8 @@ def record_answer(
 
 def get_answered() -> Dict[int, AnsweredQuestion]:
     
-    return getattr(_thread_local, "answered", {})
+    answered = _answered.get()
+    return answered if answered is not None else {}
 
 
 

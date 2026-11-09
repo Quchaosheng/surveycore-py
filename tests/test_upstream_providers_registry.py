@@ -20,6 +20,26 @@ from surveycore.providers.hooks import build_fill_http_hook, build_parse_hook
 pytestmark = pytest.mark.asyncio
 
 
+@pytest.mark.parametrize("source", ["explicit", "config", "url"])
+async def test_unknown_provider_is_rejected_before_dispatch(source) -> None:
+    adapter = registry._PROVIDER_REGISTRY[SURVEY_PROVIDER_WJX]
+    config = ExecutionConfig(url="https://example.invalid/survey", survey_provider="unknown")
+    state = ExecutionState(config=config)
+    with (
+        patch.object(adapter, "fill_survey_http_async", new=AsyncMock()) as fill_mock,
+        patch.object(adapter, "parse_survey_async", new=AsyncMock()) as parse_mock,
+        pytest.raises(RuntimeError, match="不支持的问卷 provider"),
+    ):
+        if source == "url":
+            await registry.parse_survey(config.url)
+        else:
+            await registry.fill_survey_http(
+                config, state, provider="unknown" if source == "explicit" else None
+            )
+    fill_mock.assert_not_awaited()
+    parse_mock.assert_not_awaited()
+
+
 async def test_parse_survey_routes_detected_provider_directly() -> None:
     qq_url = "https://wj.qq.com/s2/123/demo"
     adapter = SimpleNamespace(parse_survey_async=AsyncMock(return_value="qq-definition"))

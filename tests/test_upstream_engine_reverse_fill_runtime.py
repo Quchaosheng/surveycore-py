@@ -188,6 +188,17 @@ class TestReverseFillRuntimeState:
         assert result.status == "waiting"
         assert result.message == "stopped"
 
+    def test_stopped_wait_does_not_reserve_an_available_row(self) -> None:
+        state = self._build_state()
+        stopped = threading.Event()
+        stopped.set()
+
+        result = state.wait_for_reverse_fill_sample(thread_name="a", stop_signal=stopped)
+
+        assert result.message == "stopped"
+        acquired = state.acquire_reverse_fill_sample("b")
+        assert acquired.sample and acquired.sample.data_row_number == 1
+
     def test_answer_lookup_exposes_internal_errors(self) -> None:
         class BrokenSource:
             def get_reverse_fill_answer(
